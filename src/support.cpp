@@ -6,6 +6,24 @@
 #include "support.h"
 #include "freertos/FreeRTOS.h"
 
+
+void GetTimeNowString(char  strftime_buf[], int size) {
+
+    time_t now;
+
+    struct tm timeinfo;
+
+    time(&now);
+// Set timezone to China Standard Time
+    setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
+    tzset();
+
+    localtime_r(&now, &timeinfo);
+    strftime(strftime_buf, size, "%c", &timeinfo);
+    DP("Current Time:");
+    DPL(strftime_buf);
+}
+
 int SerialKeyWait() {// Wait for Key
 //    Serial.setDebugOutput(true);
 

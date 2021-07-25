@@ -2,8 +2,12 @@
 // Created by development on 29.06.21.
 //
 
-#ifndef GOODWATCH_PINOUT_H
-#define GOODWATCH_PINOUT_H
+#ifndef GLOBAL_H
+#define GLOBAL_H
+
+// display size
+#define MAX_X 400
+#define MAX_Y 300
 
 #define INF_ERROR (-1)
 
@@ -42,4 +46,4 @@
 #define EPD_BUSY 15
 
 
-#endif //GOODWATCH_PINOUT_H
+#endif //GLOBAL_H

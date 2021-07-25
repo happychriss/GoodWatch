@@ -21,6 +21,7 @@
 #include <display_support.hpp>
 #include <apds_support.hpp>
 #include <audio_support.hpp>
+#include <paint_watch.h>
 
 #undef DATA_ACQUISITION
 #undef DISABLE_EPD
@@ -74,8 +75,6 @@ void setup() {
 
     Serial.begin(115200);
 
-
-
     if (print_wakeup_reason() == ESP_SLEEP_WAKEUP_EXT0) {
         DPL("RTC Wakeup - Clear Proximity Interrupt");
         apds.clearProximityInt();
@@ -97,19 +96,7 @@ void setup() {
         sntp_setoperatingmode(SNTP_OPMODE_POLL);
         sntp_setservername(0, "pool.ntp.org");
         sntp_init();
-        time_t now;
-        char strftime_buf[64];
-        struct tm timeinfo;
 
-        time(&now);
-// Set timezone to China Standard Time
-        setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
-        tzset();
-
-        localtime_r(&now, &timeinfo);
-        strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-        DP("Current Time:");
-        DPL(strftime_buf);
 
         // indicator LED
 //    pinMode(LED_BUILTIN, OUTPUT);
@@ -117,21 +104,30 @@ void setup() {
     }
 
     DPL("**************** Init Display");
-    digitalWrite(DISPLAY_POWER, HIGH);
-    pwm_up_down(true, pwmtable_16, 256, 5);
+//    digitalWrite(DISPLAY_POWER, HIGH);
+//    pwm_up_down(true, pwmtable_16, 256, 5);
 
     display.init(115200);
-    // comment out next line to have no or minimal Adafruit_GFX code
     display.setTextColor(GxEPD_BLACK);
     display.fillScreen(GxEPD_WHITE);
     display.setFullWindow();
     display.firstPage();
 
+    char strftime_buf[64]={0};
+    GetTimeNowString(strftime_buf,64);
+
+    PaintWatch(display);
+
+/*
     do {
         display.fillScreen(GxEPD_WHITE);
+
+//        display.fillCircle(MAX_X / 2, MAX_Y / 2,70,GxEPD_BLACK);
+
         display.setCursor(100, 100);
-        display.print("Welcome to GoodWatch");
+        display.print(strftime_buf);
     } while (display.nextPage());
+*/
 //    delay(1000);
 
     DPL("****************  Init Audio"); // todo PSRAM selection disabled hardcoded in audio.cpp

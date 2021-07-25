@@ -28,5 +28,6 @@ int SerialKeyWait();
  */
 
  esp_sleep_wakeup_cause_t print_wakeup_reason();
+void GetTimeNowString(char  * strftime_buf, int size);
 
 #endif //MS_ESP32_SUPPORT_H
