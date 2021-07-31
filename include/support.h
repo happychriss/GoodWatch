@@ -2,9 +2,9 @@
 // Created by development on 21.11.20.
 //
 
+
 #define LED_BUILTIN 13
 #define I2S_MICRO I2S_NUM_1
-
 
 #ifndef MS_ESP32_SUPPORT_H
 #define MS_ESP32_SUPPORT_H
@@ -28,6 +28,7 @@ int SerialKeyWait();
  */
 
  esp_sleep_wakeup_cause_t print_wakeup_reason();
-void GetTimeNowString(char  * strftime_buf, int size);
+void GetTimeNowString(int size, struct tm *timeinfo);
+
 
 #endif //MS_ESP32_SUPPORT_H

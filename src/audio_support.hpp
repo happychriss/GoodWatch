@@ -15,6 +15,7 @@ void audio_eof_mp3(const char *info){  //end of file
 }
 
 void InitAudio() {
+    DPL("****************  Init Audio"); // todo PSRAM selection disabled hardcoded in audio.cpp
     audio.setPinout(I2S_NUM_1_BCLK, I2S_NUM_1_LRC, I2S_NUM_1_DOUT);
     audio.setVolume(18); // 0...21
 

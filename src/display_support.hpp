@@ -13,11 +13,23 @@
 #include <GxEPD2_BW.h>
 #include <GxEPD2_GFX.h>
 #include "GxEPD2_display_selection_new_style.h"
+/*
 #include <Fonts/FreeSerif24pt7b.h>
+#include "fonts/FreeSansNumOnly35.h"
+#include "fonts/FreeSansNumOnly40.h"
+#include "fonts/FreeSansNumOnly45.h"
+#include "fonts/FreeSansNumOnly48.h"
+#include "fonts/FreeSansNumOnly50.h"
+#include "fonts/FreeSansNumOnly55.h"
+*/
+
+#include "custom_fonts/FreeSansNumOnly75.h"
+
 #include <global.h>
+
 #include <analogWrite.h>
 
-#define PrintString StreamString
+
 
 const uint16_t pwmtable_16[256] PROGMEM =
         {
@@ -88,19 +100,19 @@ void helloValue(GxEPD2_GFX &display, double v, int digits) {
     Serial.print("helloValue:");
     Serial.println(v);
     display.setRotation(0);
-    display.setFont(&FreeSerif24pt7b);
+    display.setFont(&FreeSans75pt7b);
     display.setTextColor(GxEPD_BLACK);
-    PrintString valueString;
+    StreamString valueString;
     valueString.print(v, digits);
     Serial.println(valueString);
     int16_t tbx, tby;
     uint16_t tbw, tbh;
     display.getTextBounds(valueString, 0, 0, &tbx, &tby, &tbw, &tbh);
     uint16_t x = ((display.width() - tbw) / 2) - tbx;
-    uint16_t y = (display.height() * 3 / 4) + tbh / 2; // y is base line!
+    uint16_t y = (display.height() * 2 / 4) + tbh / 2; // y is base line!
     // show what happens, if we use the bounding box for partial window
     uint16_t wx = (display.width() - tbw) / 2;
-    uint16_t wy = (display.height() * 3 / 4) - tbh / 2;
+    uint16_t wy = (display.height() * 2 / 4) - tbh / 2;
     display.setPartialWindow(wx, wy, tbw, tbh);
     display.firstPage();
     do {

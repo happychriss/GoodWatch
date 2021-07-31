@@ -7,20 +7,14 @@
 #include "freertos/FreeRTOS.h"
 
 
-void GetTimeNowString(char  strftime_buf[], int size) {
+void GetTimeNowString(int size, struct tm *timeinfo) {
 
     time_t now;
-
-    struct tm timeinfo;
-
+    char strftime_buf[64]={0};
     time(&now);
-// Set timezone to China Standard Time
-    setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
-    tzset();
-
-    localtime_r(&now, &timeinfo);
-    strftime(strftime_buf, size, "%c", &timeinfo);
-    DP("Current Time:");
+    localtime_r(&now, timeinfo);
+    strftime(strftime_buf, sizeof(strftime_buf), "%c", timeinfo);
+    DP("!!!!! Current Time: ");
     DPL(strftime_buf);
 }
 
@@ -38,7 +32,6 @@ int SerialKeyWait() {// Wait for Key
 
     return Serial.read();
 
-
 }
 
 esp_sleep_wakeup_cause_t print_wakeup_reason() {
@@ -48,23 +41,24 @@ esp_sleep_wakeup_cause_t print_wakeup_reason() {
 
     switch (wakeup_reason) {
         case ESP_SLEEP_WAKEUP_EXT0 :
-            Serial.println("Wakeup caused by external signal using RTC_IO");
+            DPL("Wakeup caused by external signal using RTC_IO");
             break;
         case ESP_SLEEP_WAKEUP_EXT1 :
-            Serial.println("Wakeup caused by external signal using RTC_CNTL");
+            DPL("Wakeup caused by external signal using RTC_CNTL");
             break;
         case ESP_SLEEP_WAKEUP_TIMER :
-            Serial.println("Wakeup caused by timer");
+            DPL("Wakeup caused by timer");
             break;
         case ESP_SLEEP_WAKEUP_TOUCHPAD :
-            Serial.println("Wakeup caused by touchpad");
+            DPL("Wakeup caused by touchpad");
             break;
         case ESP_SLEEP_WAKEUP_ULP :
-            Serial.println("Wakeup caused by ULP program");
+            DPL("Wakeup caused by ULP program");
             break;
         default :
-            Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
+            DPL("Normal Boot Process");
             break;
     }
     return wakeup_reason;
 }
+

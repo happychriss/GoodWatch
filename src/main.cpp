@@ -6,13 +6,12 @@
 
 // Speech Recognition
 #include "edgeimpulse/ff_command_set_inference.h"
-#include "inference.hpp"
+#include "inference_sound.hpp"
 #include "inference_parameter.h"
 #include "driver/i2s.h"
 
 // various
-#include <WiFi.h>
-#include "WiFiCredentials.h"
+
 #include "data_acquisition.h"
 #include <lwip/apps/sntp.h>
 #include "Audio.h"
@@ -21,11 +20,13 @@
 #include <display_support.hpp>
 #include <apds_support.hpp>
 #include <audio_support.hpp>
+#include <wifi_support.hpp>
+
+#include <support.h>
 #include <paint_watch.h>
 
 #undef DATA_ACQUISITION
 #undef DISABLE_EPD
-
 
 
 //********** Global Variables ***************************************************
@@ -57,15 +58,18 @@ HTTPClient *httpClientI2S = nullptr;
 bool b_audio_end_of_mp3 = false;
 Audio audio;
 
+RTC_DATA_ATTR bool b_watch_refreshed = false;
+// RTC_DATA_ATTR int min_sim=1;
 
-
-void ei_print_config();
+esp_sleep_wakeup_cause_t wakeup_reason;
 
 void setup() {
-    char buf[128];
-    pinMode(LED_BUILTIN, OUTPUT);
 
-    // Prepare Display Light
+    Serial.begin(115200);
+    DPL("********** SETUP ***************");
+
+    // Setup pin input and output
+    pinMode(LED_BUILTIN, OUTPUT);
     pinMode(APDS9960_INT, INPUT);
     pinMode(DISPLAY_CONTROL, OUTPUT);
     pinMode(DISPLAY_POWER, OUTPUT);
@@ -73,142 +77,73 @@ void setup() {
     digitalWrite(DISPLAY_CONTROL, LOW);
     rtc_gpio_pullup_en(GPIO_NUM_34);
 
-    Serial.begin(115200);
+    // Set timezone to Berlin Standard Time
+    setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
+    tzset();
 
-    if (print_wakeup_reason() == ESP_SLEEP_WAKEUP_EXT0) {
-        DPL("RTC Wakeup - Clear Proximity Interrupt");
-        apds.clearProximityInt();
-    } else {
+    delay(400);
 
-        DPL("Starting Wifi");
-        WiFi.disconnect();
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(SSID, PASSWORD);
-        WiFi.setSleep(false);
-        if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-            Serial.println("Connection Failed! Rebooting...");
-            delay(5000);
-            ESP.restart();
-        }
-        DPL("Connected to WiFi");
-
-        DPL("SNTP Server Setup ");
-        sntp_setoperatingmode(SNTP_OPMODE_POLL);
-        sntp_setservername(0, "pool.ntp.org");
-        sntp_init();
-
-
-        // indicator LED
-//    pinMode(LED_BUILTIN, OUTPUT);
-
-    }
-
-    DPL("**************** Init Display");
-//    digitalWrite(DISPLAY_POWER, HIGH);
-//    pwm_up_down(true, pwmtable_16, 256, 5);
-
-    display.init(115200);
-    display.setTextColor(GxEPD_BLACK);
-    display.fillScreen(GxEPD_WHITE);
-    display.setFullWindow();
-    display.firstPage();
-
-    char strftime_buf[64]={0};
-    GetTimeNowString(strftime_buf,64);
-
-    PaintWatch(display);
-
-/*
-    do {
-        display.fillScreen(GxEPD_WHITE);
-
-//        display.fillCircle(MAX_X / 2, MAX_Y / 2,70,GxEPD_BLACK);
-
-        display.setCursor(100, 100);
-        display.print(strftime_buf);
-    } while (display.nextPage());
-*/
-//    delay(1000);
-
-    DPL("****************  Init Audio"); // todo PSRAM selection disabled hardcoded in audio.cpp
-
-    InitAudio();
-//    SerialKeyWait();
-    audio.connecttoFS(SD, "/test2.wav");
-//     audio.connecttohost("http://mp3.ffh.de/radioffh/hqlivestream.aac");
-//    SerialKeyWait();
-    DPL("**************** V1 Init Speech");
-    DP("Main Loop - Running on Core:");
-    DPL(xPortGetCoreID());
-//    SerialKeyWait();
-#ifdef DATA_ACQUISITION
-    // launch WiFi
-    // setup the HTTP Client
-     wifiClientI2S = new WiFiClient();
-     httpClientI2S = new HTTPClient();
-#else
-    ei_print_config();
-    DPL("Starting Inversion Mode");
-    run_classifier_init();
-#endif
-
-    // setup buffers and start CaptureSamples, ends in inference.buffers
-    if (microphone_inference_start(EI_CLASSIFIER_SLICE_SIZE) == false) {
-        ei_printf("ERR: Failed to setup audio sampling\r\n");
-        return;
-    }
-
-    delay(100);
 }
+
+/*void  PaintWatchTask(GxEPD2_GFX &display) {
+    PaintWatch(display, true);
+    vTaskDelete(NULL);
+}*/
 
 
 void loop() {
 
 
-#ifdef DATA_ACQUISITION
-    sendData(wifiClientI2S, httpClientI2S, I2S_SERVER_URL, (uint8_t *) &inference.buffers[inference.buf_select ^ 1][0], EI_CLASSIFIER_SLICE_SIZE * 2);
-#else
-    int value_idx = inference_get_category_idx();
-    if (value_idx==INF_ERROR) {
-        DPL("INF Error");
-    } else {
-        DP("Got Inference Result:");DPL(value_idx);
+    DPL("****** Main Loop ***********");
+    wakeup_reason=print_wakeup_reason();
+
+    // Normal Boot **************************************************************************
+    if (wakeup_reason==ESP_SLEEP_WAKEUP_UNDEFINED) {
+        SetupWifi_SNTP();
+        PaintWatch(display, false, false);
+     }
+
+    // Proxi Hand Movement **************************************************************************
+    if (wakeup_reason==ESP_SLEEP_WAKEUP_EXT0) {
+        DPL("!!!! Proximity Wakeup");
+
+        apds.clearProximityInt();
+        digitalWrite(DISPLAY_POWER, HIGH);
+        pwm_up_down(true, pwmtable_16, 256, 5);
+        PaintWatch(display, false, true);
+        delay(5000);
+        pwm_up_down(false, pwmtable_16, 256, 5);
+
     }
-#ifndef DISABLE_EPD
 
-
-//            String number_result = String(ei_classifier_inferencing_categories[final_value_idx]);
-    helloValue(display, value_idx, 0);
-    //           helloFullScreenPartialMode(display);
-    DPL("Play the song!!!");
-while(!b_audio_end_of_mp3) {
-    audio.loop();
-    if (Serial.available()) { // put streamURL in serial monitor
-        audio.stopSong();
-        String r = Serial.readString();
-        r.trim();
-        if (r.length() > 5) audio.connecttohost(r.c_str());
-        log_i("free heap=%i", ESP.getFreeHeap());
+    // 5 min Watch Refresh  **************************************************************************
+    if (wakeup_reason==ESP_SLEEP_WAKEUP_TIMER) {
+        DPL("!!! RTC Wakeup after 5min");
+        PaintWatch(display, true, false);
     }
-}
 
-    DPL("DONE: Play the song!!!");
-    // Get Ready for DEEP SLEEP *******************************************************************
-    apds_init_proximity();
 
-    pwm_up_down(false, pwmtable_16, 256, 5);
-    apds.clearProximityInt();
+    // ************ Deep Sleep *******************************
     Serial.println("Prepare deep sleep");
+    apds_init_proximity();
+    apds.clearProximityInt();
+
+    time_t now;
+    time(&now);
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+
+#define SLEEP_MIN 5
+    int sleep_sec = (SLEEP_MIN-(timeinfo.tm_min%SLEEP_MIN))*60+(60-timeinfo.tm_sec);
+
+    if (sleep_sec==0) sleep_sec=SLEEP_MIN*60;
+    DP("Going to sleep now for (min/sec):");DP(sleep_sec/60);DP(":");DPL(sleep_sec%60);
+
+    esp_sleep_enable_timer_wakeup(sleep_sec*1000*1000);
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_34, LOW); //1 = High, 0 = Low
-    Serial.println("Going to sleep now");
+
     display.powerOff();
     esp_deep_sleep_start();
-
-#endif
-
-
-#endif //DATA_ACQUISITION
-
 
 }
 
