@@ -25,20 +25,18 @@ void SetupWifi_SNTP() {
         delay(5000);
         ESP.restart();
     }
-
+    delay(500);
     DPL(": DONE");
     DPL("Connected to WiFi, now SNT Server Setup");
 
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "pool.ntp.org");
+    sntp_setservername(0,  (char*) "pool.ntp.org");
     sntp_init();
     setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
     tzset();
-    delay(200);
-    DPL("SNTP Server Setup-Done ");
 
     struct tm timeinfo{};
-    GetTimeNowString(64, &timeinfo);
+    GetTimeNowString(&timeinfo);
     DPL("*** WIFI & SNTP Setup Done");
 
 }

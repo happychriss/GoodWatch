@@ -23,7 +23,7 @@
 #include "fonts/FreeSansNumOnly55.h"
 */
 
-#include "custom_fonts/FreeSansNumOnly75.h"
+#include "custom_fonts/FreeSansNumOnly70.h"
 
 #include <global.h>
 
@@ -71,16 +71,14 @@ private:
 
 void pwm_up_down(boolean direction_up, const uint16_t pwm_table[], int16_t size, uint16_t delay_ms) {
     int16_t tmp;
-
+    analogWriteResolution(12);
     if (direction_up) {
 
         Serial.println("Start-UP");
 
         for (tmp = 0; tmp < size; tmp++) {
             uint16_t out = pgm_read_word (&pwm_table[tmp]);
-//        Serial.println(out);
             analogWrite(DISPLAY_CONTROL, out);
-
             delay(delay_ms);
         }
     } else {
@@ -100,7 +98,7 @@ void helloValue(GxEPD2_GFX &display, double v, int digits) {
     Serial.print("helloValue:");
     Serial.println(v);
     display.setRotation(0);
-    display.setFont(&FreeSans75pt7b);
+    display.setFont(&FreeSans70pt7b);
     display.setTextColor(GxEPD_BLACK);
     StreamString valueString;
     valueString.print(v, digits);

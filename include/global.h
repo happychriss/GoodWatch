@@ -12,7 +12,7 @@
 #define INF_ERROR (-1)
 
 // Distance Measurement APDS9960 via *I2C* and GPIO 21=SDA and 22=SCL
-#define APDS9960_INT   34  // Needs to be an interrupt pin
+#define PIR_INT   34  // Needs to be an interrupt pin
 
 // Display Light
 #define DISPLAY_CONTROL 27 //dims the light
@@ -33,6 +33,8 @@
 #define I2S_NUM_2_BCLK 25
 #define I2S_NUM_2_LRC 33
 #define I2S_NUM_2_DIN 32
+
+#define BATTERY_VOLTAGE 35
 
 // EPD Pins - GxEPD2_display_selection_new_style.h using SPI
 // EPD Pins****

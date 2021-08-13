@@ -3,18 +3,27 @@
 //
 #include <Arduino.h>
 #include <StreamString.h>
+
+#include <ctime>
+
 #include "paint_watch.h"
 #include "support.h"
-#include "custom_fonts/FreeSansNumOnly75.h"
+#include "custom_fonts/FreeSansNumOnly70.h"
+#include <Fonts/FreeSans24pt7b.h>
+#include <Fonts/FreeSans18pt7b.h>
+
 
 //
 // Created by development on 25.07.21.
 //9
 
 #define M_PI 3.1415926535897932
-#define RIN 120
-#define RIN_EMPTY 138
-#define ROUT 140
+#define RIN 110
+#define RIN_EMPTY 129 //empty marker
+#define ROUT 130
+#define SEP_IN 110
+#define SEP_OUT 150
+
 
 struct st_pwin {
     int x0;
@@ -24,7 +33,28 @@ struct st_pwin {
     bool simulate;
 };
 
+void printText(GxEPD2_GFX &my_display, char * text, uint line) {
 
+    //Serial.println("helloWorld");
+    my_display.setRotation(1);
+    my_display.setFont(&FreeSans24pt7b);
+    my_display.setTextColor(GxEPD_BLACK);
+    int16_t tbx, tby; uint16_t tbw, tbh;
+    my_display.getTextBounds(text, 0, 0, &tbx, &tby, &tbw, &tbh);
+    // center bounding box by transposition of origin:
+    uint16_t x = ((my_display.width() - tbw) / 2) - tbx;
+    uint16_t y = ((my_display.height() - tbh) / 2) - tby;
+    my_display.setFullWindow();
+    my_display.firstPage();
+    do
+    {
+        my_display.fillScreen(GxEPD_WHITE);
+        my_display.setCursor(x, y);
+        my_display.print(text);
+    }
+    while (my_display.nextPage());
+    //Serial.println("helloWorld done");
+}
 
 void gfx_line(GxEPD2_GFX &my_display, st_pwin *partial_win, int x0, int y0, int x1, int y1) {
 
@@ -201,66 +231,165 @@ void DrawArcCircle_Q4(GxEPD2_GFX &my_display, st_pwin *pwin, int x0, int y0, dou
 void PaintFullWatchMin(GxEPD2_GFX &my_display, st_pwin *pwin, int min) {
     int rin;
 
-    rin = (min > 5) ? RIN : RIN_EMPTY;
+
+    my_display.drawFastHLine(my_display.width() / 2 - (ROUT + 20), my_display.height() / 2, 40, GxEPD_BLACK);
+    my_display.drawFastHLine(my_display.width() / 2 + (ROUT + 20), my_display.height() / 2, 40, GxEPD_BLACK);
+
+    rin = (min >= 5) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q1(my_display, pwin, 200, 150, 4, 26, rin, ROUT);
 
-    rin = (min > 10) ? RIN : RIN_EMPTY;
+    rin = (min >= 10) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q1(my_display, pwin, 200, 150, 34, 56, rin, ROUT);
 
-    rin = (min > 15) ? RIN : RIN_EMPTY;
+    rin = (min >= 15) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q1(my_display, pwin, 200, 150, 64, 86, rin, ROUT);
 
-    rin = (min > 20) ? RIN : RIN_EMPTY;
+    DrawArcCircle_Q1(my_display, pwin, 200, 150, 89, 90, SEP_IN, SEP_OUT);
+    DrawArcCircle_Q2(my_display, pwin, 200, 150, 90, 91, SEP_IN, SEP_OUT);
+
+    rin = (min >= 20) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q2(my_display, pwin, 200, 150, 94, 116, rin, ROUT);
 
-    rin = (min > 25) ? RIN : RIN_EMPTY;
+    rin = (min >= 25) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q2(my_display, pwin, 200, 150, 124, 146, rin, ROUT);
 
-    rin = (min > 30) ? RIN : RIN_EMPTY;
+    rin = (min >= 30) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q2(my_display, pwin, 200, 150, 154, 176, rin, ROUT);
 
-    rin = (min > 35) ? RIN : RIN_EMPTY;
+    DrawArcCircle_Q2(my_display, pwin, 200, 150, 179, 180, SEP_IN, SEP_OUT);
+    DrawArcCircle_Q3(my_display, pwin, 200, 150, 180, 181, SEP_IN, SEP_OUT);
+
+    rin = (min >= 35) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q3(my_display, pwin, 200, 150, 184, 206, rin, ROUT);
 
-    rin = (min > 40) ? RIN : RIN_EMPTY;
+    rin = (min >= 40) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q3(my_display, pwin, 200, 150, 214, 236, rin, ROUT);
 
-    rin = (min > 45) ? RIN : RIN_EMPTY;
+    rin = (min >= 45) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q3(my_display, pwin, 200, 150, 244, 266, rin, ROUT);
 
-    rin = (min > 50) ? RIN : RIN_EMPTY;
+    DrawArcCircle_Q3(my_display, pwin, 200, 150, 269, 270, SEP_IN, SEP_OUT);
+    DrawArcCircle_Q4(my_display, pwin, 200, 150, 270, 271, SEP_IN, SEP_OUT);
+
+    rin = (min >= 50) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q4(my_display, pwin, 200, 150, 274, 296, rin, ROUT);
 
-    rin = (min > 55) ? RIN : RIN_EMPTY;
+    rin = (min >= 55) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q4(my_display, pwin, 200, 150, 304, 326, rin, ROUT);
 
 //    rin = (min > 55) ? RIN : RIN_EMPTY;
     DrawArcCircle_Q4(my_display, pwin, 200, 150, 334, 356, RIN_EMPTY, ROUT);
+
+    DrawArcCircle_Q4(my_display, pwin, 200, 150, 359, 360, SEP_IN, SEP_OUT);
+    DrawArcCircle_Q1(my_display, pwin, 200, 150, 0, 1, SEP_IN, SEP_OUT);
+
+
 }
 
 void PaintPartialWatchMin(GxEPD2_GFX &my_display, st_pwin *pwin, int min) {
     int rin = RIN;
-    if (min > 55)      DrawArcCircle_Q4(my_display, pwin, 200, 150, 304,326, rin, ROUT);
-    else if (min > 50)      DrawArcCircle_Q4(my_display, pwin, 200, 150, 274,296, rin, ROUT);
-    else if (min > 45) DrawArcCircle_Q4(my_display, pwin, 200, 150, 244, 266, rin, ROUT);
-    else if (min > 40) DrawArcCircle_Q3(my_display, pwin, 200, 150, 214, 236, rin, ROUT);
-    else if (min > 35) DrawArcCircle_Q3(my_display, pwin, 200, 150, 184, 206, rin, ROUT);
-    else if (min > 30) DrawArcCircle_Q2(my_display, pwin, 200, 150, 154, 176, rin, ROUT);
-    else if (min > 25) DrawArcCircle_Q2(my_display, pwin, 200, 150, 124, 146, rin, ROUT);
-    else if (min > 20) DrawArcCircle_Q2(my_display, pwin, 200, 150, 94, 116, rin, ROUT);
-    else if (min > 15) DrawArcCircle_Q1(my_display, pwin, 200, 150, 64, 86, rin, ROUT);
-    else if (min > 10) DrawArcCircle_Q1(my_display, pwin, 200, 150, 34, 56, rin, ROUT);
-    else if (min > 5) DrawArcCircle_Q1(my_display, pwin, 200, 150, 4, 26, rin, ROUT);
+    if (min >= 55) DrawArcCircle_Q4(my_display, pwin, 200, 150, 304, 326, rin, ROUT);
+    else if (min >= 50) DrawArcCircle_Q4(my_display, pwin, 200, 150, 274, 296, rin, ROUT);
+    else if (min >= 45) DrawArcCircle_Q3(my_display, pwin, 200, 150, 244, 266, rin, ROUT);
+    else if (min >= 40) DrawArcCircle_Q3(my_display, pwin, 200, 150, 214, 236, rin, ROUT);
+    else if (min >= 35) DrawArcCircle_Q3(my_display, pwin, 200, 150, 184, 206, rin, ROUT);
+    else if (min >= 30) DrawArcCircle_Q2(my_display, pwin, 200, 150, 154, 176, rin, ROUT);
+    else if (min >= 25) DrawArcCircle_Q2(my_display, pwin, 200, 150, 124, 146, rin, ROUT);
+    else if (min >= 20) DrawArcCircle_Q2(my_display, pwin, 200, 150, 94, 116, rin, ROUT);
+    else if (min >= 15) DrawArcCircle_Q1(my_display, pwin, 200, 150, 64, 86, rin, ROUT);
+    else if (min >= 10) DrawArcCircle_Q1(my_display, pwin, 200, 150, 34, 56, rin, ROUT);
+    else if (min >= 5) DrawArcCircle_Q1(my_display, pwin, 200, 150, 4, 26, rin, ROUT);
 
 //            display.drawRect(pwin.x0, pwin.y0, pwin.x1-pwin.x0, pwin.y1-pwin.y0,GxEPD_BLACK);
 }
 
+
+void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
+    struct tm timeinfo = {0};
+    //Paint Time
+    int16_t tbx, tby;
+    uint16_t tbw, tbh;
+
+    int16_t sbx, sby;
+    uint16_t sbw, sbh;
+
+    display.init(0, false);
+
+    DP("Timebase for watch display - ");
+    GetTimeNowString(&timeinfo);
+    char strftime_buf[50];
+    strftime(strftime_buf, sizeof(strftime_buf), "%H:%M:%S", &timeinfo);
+    DP("Time:");
+    DPL(strftime_buf);
+
+    display.setFont(&FreeSans70pt7b);
+    display.getTextBounds("88", 0, 0, &tbx, &tby, &tbw, &tbh);
+    uint16_t tx = ((display.width() - tbw) / 2) - tbx;
+    uint16_t ty = ((display.height() - tbh) / 2) - tby - tbh; // y is base line!
+    display.setPartialWindow(tx, ty, tbw, tbh + 8);
+
+    display.setFont(&FreeSans18pt7b);
+    display.getTextBounds(strftime_buf, tx, ty, &sbx, &sby, &sbw, &sbh);
+
+    // center the bounding box by transposition of the origin:
+    uint16_t x1 = ((tbw - sbw) / 2);
+    uint16_t y1 = ((tbh - sbh) / 2) + sbh;
+
+    DP("tbw:");
+    DP(tbw);
+    DP(" tbh:");
+    DPL(tbh);
+    DP("sbw:");
+    DP(sbw);
+    DP(" sbh:");
+    DPL(sbh);
+    DP("tx:");
+    DP(tx);
+    DP(" ty:");
+    DPL(ty);
+    DP("x1:");
+    DP(x1);
+    DP(" y1:");
+    DPL(y1);
+
+
+    display.firstPage();
+    do {
+//        display.setCursor(x1, y1);
+        display.fillScreen(GxEPD_WHITE);
+        display.setTextColor(GxEPD_BLACK);
+        display.setCursor(tx + x1, ty + y1);
+        display.print(strftime_buf);
+    } while (display.nextPage());
+
+    delay(2000);
+    display.firstPage();
+    do {
+        //Paint Time
+        int16_t tbx, tby;
+        uint16_t tbw, tbh;
+        StreamString valueString;
+        valueString.print(timeinfo.tm_hour, 0);
+        display.setTextColor(GxEPD_BLACK);
+        display.setFont(&FreeSans70pt7b);
+        display.getTextBounds(valueString, 0, 0, &tbx, &tby, &tbw, &tbh);
+        uint16_t x = ((display.width() - tbw) / 2) - tbx;
+        uint16_t y = (display.height() * 2 / 4) + tbh / 2; // y is base line!
+        display.setCursor(x, y);
+        display.print(valueString);
+    } while (display.nextPage());
+}
+
+
 void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm_time) {
 
     DPL("****** Entering Paint Watch Function");
+    display.init(0, false);
 
-    struct tm timeinfo{};
-    GetTimeNowString(64, &timeinfo);
+    struct tm timeinfo = {0};
+    DP("Timebase for watch display - ");
+    GetTimeNowString(&timeinfo);
+
 /*    int min =min_sim;
     min_sim=min_sim+5;
     if (min_sim>60) min_sim=0;
@@ -274,56 +403,63 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
     pwin.x1 = 0;
     pwin.y1 = 0;
 
-    int16_t tbx, tby;
-    uint16_t tbw, tbh;
-    StreamString valueString;
-    valueString.print(timeinfo.tm_hour, 0);
-    display.setFont(&FreeSans75pt7b);
-    display.getTextBounds(valueString, 0, 0, &tbx, &tby, &tbw, &tbh);
-    uint16_t x = ((display.width() - tbw) / 2) - tbx;
-    uint16_t y = (display.height() * 2 / 4) + tbh / 2; // y is base line!
+
 
 
 //    display.init(115200, false);
-    display.init(115200, false);
+
 
     // just make sure the watch get refreshed
-    if (min<7 && !b_watch_refreshed) {
+    if (min < 7 && !b_watch_refreshed) {
         DPL("***New Hour, repaint full watch");
-        b_watch_refreshed=true;
-        b_refresh_only=false;
-    } else if (min>10) {
+        b_watch_refreshed = true;
+        b_refresh_only = false;
+    } else if (min > 10) {
         DPL("***No new Hour, normal refresh");
-        b_watch_refreshed=false;
+        b_watch_refreshed = false;
     }
 
     // to determine area that needs to be refreshed
     if (b_refresh_only) {
         // Run simulation to determine partial windows size and set partial windows
         pwin.simulate = true;
-        PaintPartialWatchMin(display, &pwin, min);
-        display.setPartialWindow(pwin.x0, pwin.y0, pwin.x1 - pwin.x0, pwin.y1 - pwin.y0);
+
     } else {
         display.setTextColor(GxEPD_BLACK);
-        display.setFont(&FreeSans75pt7b);
+        display.setFont(&FreeSans70pt7b);
     }
 
     // *************** Paint the watch in EPD loop *************************************
 
     display.firstPage();
     do {
-        pwin.simulate = false;
 
         if (b_refresh_only) {
             DPL("***** Partial Refresh of Display ***");
+
+            pwin.simulate = true;
             PaintPartialWatchMin(display, &pwin, min);
+            display.setPartialWindow(pwin.x0, pwin.y0, pwin.x1 - pwin.x0, pwin.y1 - pwin.y0);
+            pwin.simulate = false;
+            PaintPartialWatchMin(display, &pwin, min);
+
 
         } else {
             DPL("***** Full Refresh of Display ***");
+            pwin.simulate = false;
             display.fillScreen(GxEPD_WHITE);
             PaintFullWatchMin(display, &pwin, min);
 
             //Paint Time
+            int16_t tbx, tby;
+            uint16_t tbw, tbh;
+            StreamString valueString;
+            valueString.print(timeinfo.tm_hour, 0);
+            display.setTextColor(GxEPD_BLACK);
+            display.setFont(&FreeSans70pt7b);
+            display.getTextBounds(valueString, 0, 0, &tbx, &tby, &tbw, &tbh);
+            uint16_t x = ((display.width() - tbw) / 2) - tbx;
+            uint16_t y = (display.height() * 2 / 4) + tbh / 2; // y is base line!
             display.setCursor(x, y);
             display.print(valueString);
 

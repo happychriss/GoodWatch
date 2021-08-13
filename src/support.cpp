@@ -7,15 +7,16 @@
 #include "freertos/FreeRTOS.h"
 
 
-void GetTimeNowString(int size, struct tm *timeinfo) {
+void GetTimeNowString(struct tm *timeinfo) {
 
     time_t now;
-    char strftime_buf[64]={0};
+    char strftime_buf[30]={};
     time(&now);
     localtime_r(&now, timeinfo);
     strftime(strftime_buf, sizeof(strftime_buf), "%c", timeinfo);
-    DP("!!!!! Current Time: ");
+    DP("Current Time: ");
     DPL(strftime_buf);
+
 }
 
 int SerialKeyWait() {// Wait for Key

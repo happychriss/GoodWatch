@@ -8,7 +8,7 @@
 
 #ifndef MS_ESP32_SUPPORT_H
 #define MS_ESP32_SUPPORT_H
-#define MYDEBUG
+#define  MYDEBUG
 #ifdef MYDEBUG
 #define MYDEBUG_CORE
 #define DP(x)     Serial.print (x)
@@ -28,7 +28,7 @@ int SerialKeyWait();
  */
 
  esp_sleep_wakeup_cause_t print_wakeup_reason();
-void GetTimeNowString(int size, struct tm *timeinfo);
+void GetTimeNowString(struct tm *timeinfo);
 
 
 #endif //MS_ESP32_SUPPORT_H
