@@ -14,6 +14,7 @@
 #define DP(x)     Serial.print (x)
 #define DPD(x)     Serial.print (x, DEC)
 #define DPL(x)  Serial.println (x)
+#define DPF(...) Serial.printf (__VA_ARGS__)
 #else
 #define DP(x)
 #define DPD(x)
@@ -28,7 +29,7 @@ int SerialKeyWait();
  */
 
  esp_sleep_wakeup_cause_t print_wakeup_reason();
-void GetTimeNowString(struct tm *timeinfo);
+void GetTimeNowString(struct tm *timeinfo, boolean source_rtc);
 
 
 #endif //MS_ESP32_SUPPORT_H

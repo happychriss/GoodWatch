@@ -316,7 +316,7 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
     display.init(0, false);
 
     DP("Timebase for watch display - ");
-    GetTimeNowString(&timeinfo);
+    GetTimeNowString(&timeinfo, true);
     char strftime_buf[50];
     strftime(strftime_buf, sizeof(strftime_buf), "%H:%M:%S", &timeinfo);
     DP("Time:");
@@ -388,7 +388,7 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
 
     struct tm timeinfo = {0};
     DP("Timebase for watch display - ");
-    GetTimeNowString(&timeinfo);
+    GetTimeNowString(&timeinfo, true);
 
 /*    int min =min_sim;
     min_sim=min_sim+5;
@@ -396,6 +396,7 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
     DP("****** MIN SIM:");DPL(min_sim);*/
 
     int min = timeinfo.tm_min;
+    if (timeinfo.tm_sec>45 && min<59) min=min+1; //if wakeup is at 04:59 - make sure we enable the next segment
 
     st_pwin pwin{};
     pwin.x0 = display.width() - 1;

@@ -5,17 +5,39 @@
 #include "Arduino.h"
 #include "support.h"
 #include "freertos/FreeRTOS.h"
+#include <RTClib.h>
+#include <sys/time.h>
+
+extern RTC_DS1307 rtc_watch;
 
 
-void GetTimeNowString(struct tm *timeinfo) {
-
+void GetTimeNowString(struct tm *timeinfo, boolean source_rtc) {
     time_t now;
     char strftime_buf[30]={};
-    time(&now);
-    localtime_r(&now, timeinfo);
+    // Take time from ESP32
+    if (!source_rtc) {
+        time(&now);
+        DP("Current *local* Time from Internet - ESP32: ");
+        localtime_r(&now, timeinfo);
+    }
+    else {
+        // Watch stores local time
+        DateTime rtc_now = rtc_watch.now();
+        timeval tv;
+        tv.tv_sec = rtc_now.unixtime();
+        tv.tv_usec = 0;  // keine Mikrosekunden setzen
+        settimeofday(&tv, NULL);
+        timeinfo->tm_hour=rtc_now.hour();
+        timeinfo->tm_min=rtc_now.minute();
+        timeinfo->tm_sec=rtc_now.second();
+        timeinfo->tm_mday=rtc_now.day();
+        timeinfo->tm_year=rtc_now.year();
+        DP("Current *local* Time from RTC: ");
+    }
+
     strftime(strftime_buf, sizeof(strftime_buf), "%c", timeinfo);
-    DP("Current Time: ");
     DPL(strftime_buf);
+
 
 }
 

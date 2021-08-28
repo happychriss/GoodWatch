@@ -14,7 +14,7 @@
 #include "inference_parameter.h"
 #include "edgeimpulse/ff_command_set_inference.h"
 
-
+#undef DEBUG_PRINT
 
 /** Audio buffers, pointers and selectors */
 typedef struct {
@@ -249,7 +249,7 @@ int microphone_audio_signal_get_data(size_t offset, size_t length, float *out_pt
 
 int inference_get_category_idx() {
 // Inference Global Data
-
+    DPL("Start Inference!");
     int print_results = 0;
     short result_state = STATE_NOTHING;
     float values[EI_CLASSIFIER_LABEL_COUNT] = {0.0};
@@ -260,6 +260,7 @@ int inference_get_category_idx() {
 
         if (!m) {
             // todo uncomment error message
+            DPL("ERROR: Start Inference - microphone_inference_record");
             // ei_printf("ERR: Failed to record audio...\n");
             return INF_ERROR;
         }
@@ -296,14 +297,16 @@ int inference_get_category_idx() {
             }
 
             // Print list of result values
+#ifdef DEBUG_PRINT
             if (b_found_result) {
+
                 for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
                     ei_printf("    %s: %.5f", result.classification[ix].label, result.classification[ix].value);
                     if (max_value_idx == ix) ei_printf("<-----\n"); else ei_printf("\n");
                 }
                 ei_printf("\n");
             } //else { ei_printf("."); }
-
+#endif
             if (b_found_result) {
                 result_state = STATE_FOUND;
                 values[max_value_idx] = values[max_value_idx] + max_value;
@@ -338,9 +341,7 @@ int inference_get_category_idx() {
                     }
                 }
                 DP("\n------------> ");
-//                DP(ei_classifier_inferencing_categories[final_value_idx]);
-                DP(" - ");
-                DPL(final_value);
+                DPF("Result: %i - %f2.4\n",final_value_idx,final_value);
                 return final_value_idx;
 
             }

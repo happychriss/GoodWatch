@@ -36,7 +36,7 @@ void SetupWifi_SNTP() {
     tzset();
 
     struct tm timeinfo{};
-    GetTimeNowString(&timeinfo);
+    delay(500); //needed until time is available
     DPL("*** WIFI & SNTP Setup Done");
 
 }

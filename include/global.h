@@ -5,6 +5,8 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+
+
 // display size
 #define MAX_X 400
 #define MAX_Y 300
@@ -16,7 +18,7 @@
 
 // Display Light
 #define DISPLAY_CONTROL 27 //dims the light
-#define DISPLAY_POWER 13// enables the  MT3608
+#define DISPLAY_AND_SOUND_POWER 13// enables the  MT3608 (power for display and the MAX98735A (I2S Sound, SD to ground)
 
 //SD Card (Pins are not used, set as default) using SPI together with EPD
 #define SD_CS          4
