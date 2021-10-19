@@ -96,14 +96,14 @@ public:
 
     //***************************************************************************
     uint8_t WriteMemoryBuffer(uint8_t *pValue, uint8_t countBytes) {
-        DP("Write Memory Buffer, size:");
-        DPL(countBytes);
+//        DP("Write Memory Buffer, size:");
+//        DPL(countBytes);
         uint16_t eepromWriteAddress = 0;
         beginTransmission(eepromWriteAddress);
 
         while (countBytes > 0) {
 
-            DPF("[%i] -  %c\n", countBytes, (char) *pValue);
+//            DPF("[%i] -  %i\n", countBytes,  *pValue);
             _wire.write(*pValue++);
             delay(10); // per spec, memory writes
             countBytes--;
@@ -111,9 +111,9 @@ public:
 
             // xxxppppp pppa aaaa => p = page #, a = address within the page
             if (eepromWriteAddress < EEPROM_BYTES && ((eepromWriteAddress >> 4) & 0xFF) != (((eepromWriteAddress - 1) >> 4) & 0xFF)) {
-                DPL("***!!! NEW Page !!!***");
-                DP("WriteAddress:");
-                DPL(eepromWriteAddress);
+//                DPL("***!!! NEW Page !!!***");
+//                DP("WriteAddress:");
+//                DPL(eepromWriteAddress);
                 // This is a new page, finish the previous write and start a new one
                 endTransmission();
                 beginTransmission(eepromWriteAddress);
@@ -143,7 +143,7 @@ private:
             // Failure
             return 0;
         }
-        DPL("Wait for complete");
+//        DPL("Wait for complete");
         // Poll for write to complete
         while (!Wire.requestFrom(_address, (uint8_t) 1));
         // Move to new page

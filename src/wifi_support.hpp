@@ -27,7 +27,7 @@ void SetupWifi_SNTP() {
     }
     delay(500);
     DPL(": DONE");
-    DPL("Connected to WiFi, now SNT Server Setup");
+    DP("SNT Server Setup:");
 
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0,  (char*) "pool.ntp.org");
@@ -35,8 +35,7 @@ void SetupWifi_SNTP() {
     setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
     tzset();
 
-    struct tm timeinfo{};
     delay(500); //needed until time is available
-    DPL("*** WIFI & SNTP Setup Done");
+    DPL("DONE");
 
 }

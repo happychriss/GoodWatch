@@ -18,6 +18,6 @@
 #define PT12_WIDTH 20
 
 void ProgramAlarm(GxEPD2_GFX &d );
-void ActivateAlarm(GxEPD2_GFX &d);
+int DeactivateOneTimeAlarm();
 
 #endif //GOODWATCH_PAINT_ALARM_H

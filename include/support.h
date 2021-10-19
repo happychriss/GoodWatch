@@ -3,11 +3,13 @@
 //
 
 
-#define LED_BUILTIN 13
-#define I2S_MICRO I2S_NUM_1
 
 #ifndef MS_ESP32_SUPPORT_H
 #define MS_ESP32_SUPPORT_H
+#undef LED_BUILTIN
+#define LED_BUILTIN 13
+#define I2S_MICRO I2S_NUM_1
+
 #define  MYDEBUG
 #ifdef MYDEBUG
 #define MYDEBUG_CORE
@@ -29,7 +31,7 @@ int SerialKeyWait();
  */
 
  esp_sleep_wakeup_cause_t print_wakeup_reason();
-void GetTimeNowString(struct tm *timeinfo, boolean source_rtc);
+
 
 
 #endif //MS_ESP32_SUPPORT_H

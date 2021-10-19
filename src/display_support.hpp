@@ -25,7 +25,7 @@
 
 #include "custom_fonts/FreeSansNumOnly70.h"
 
-#include <global.h>
+#include <global_hardware.h>
 
 #include <analogWrite.h>
 

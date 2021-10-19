@@ -67,7 +67,7 @@
 //#define GxEPD2_DRIVER_CLASS GxEPD2_it60_1448x1072 // ED060KC1 1448x1072
 
 // SS is usually used for CS. define here for easy change
-#include <global.h>
+#include <global_hardware.h>
 
 
 #ifndef EPD_CS

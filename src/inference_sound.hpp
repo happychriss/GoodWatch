@@ -3,7 +3,7 @@
 //
 
 // clang-format on
-#include "global.h"
+#include "global_hardware.h"
 #include "support.h"
 #include "driver/i2s.h"
 #include "esp_log.h"
@@ -34,6 +34,9 @@ extern bool debug_nn; // Set this to true to see e.g. features generated from th
 
 extern QueueHandle_t m_i2sQueue;
 
+bool b_voice_init = false;
+TaskHandle_t xHandle = NULL;
+
 /**
  * @brief      Init inferencing struct and setup/start PDM
  *
@@ -41,6 +44,8 @@ extern QueueHandle_t m_i2sQueue;
  *
  * @return     { description_of_the_return_value }
  */
+
+
 
 
 void ei_print_config() {// summary of inferencing settings (from model_metadata.h)
@@ -185,7 +190,7 @@ bool microphone_inference_start(uint32_t n_samples) {
 
     record_ready = true;
 
-    xTaskCreatePinnedToCore(CaptureSamples, "CaptureSamples", 1024 * 32, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(CaptureSamples, "CaptureSamples", 1024 * 32, NULL, 1, &xHandle,0);
 
     return true;
 }
@@ -203,7 +208,6 @@ bool microphone_inference_record(void) {
     if (inference.buf_ready == 1) {
 //  todo: uncomment error message
         //        DP("Error sample buffer overrun. Decrease the number of slices per model window, (EI_CLASSIFIER_SLICES_PER_MODEL_WINDOW)\n");
-        DPL("-");
         ret = false;
     }
 
@@ -225,6 +229,10 @@ void microphone_inference_end(void) {
     free(inference.buffers[0]);
     free(inference.buffers[1]);
     free(sampleBuffer);
+    if( xHandle != nullptr )
+    {
+        vTaskDelete( xHandle );
+    }
 }
 
 /**
@@ -246,8 +254,27 @@ int microphone_audio_signal_get_data(size_t offset, size_t length, float *out_pt
 #define STATE_FOUND_MISSED_TWO 3
 #define STATE_RESOLVED 4
 
+void InitVoiceCommands() {
+    if (!b_voice_init) {
+        b_voice_init=true;
+        DPF("Starting Inversion Mode - running on core: %i\n", xPortGetCoreID());
+        run_classifier_init();
+        if (microphone_inference_start(EI_CLASSIFIER_SLICE_SIZE) == false) {
+            ei_printf("ERR: Failed to setup audio sampling\r\n");
+        }
+    }
+}
 
-int inference_get_category_idx() {
+void FinishVoiceCommands() {
+    if (b_voice_init) {
+        b_voice_init=false;
+        microphone_inference_end();
+    }
+}
+
+
+
+int GetVoiceCommand() {
 // Inference Global Data
     DPL("Start Inference!");
     int print_results = 0;
@@ -256,13 +283,14 @@ int inference_get_category_idx() {
 
     while (true) {
 
-        bool m = microphone_inference_record();
+        bool m=false;
 
-        if (!m) {
+        while (!m) {
+            m = microphone_inference_record();
             // todo uncomment error message
-            DPL("ERROR: Start Inference - microphone_inference_record");
+  //          DPL("ERROR: Start Inference - microphone_inference_record");
             // ei_printf("ERR: Failed to record audio...\n");
-            return INF_ERROR;
+            delay(1);
         }
 
         signal_t signal;
@@ -341,7 +369,7 @@ int inference_get_category_idx() {
                     }
                 }
                 DP("\n------------> ");
-                DPF("Result: %i - %f2.4\n",final_value_idx,final_value);
+                DPF("Result: %i - %f\n",final_value_idx,final_value);
                 return final_value_idx;
 
             }

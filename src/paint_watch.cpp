@@ -9,15 +9,16 @@
 #include "paint_watch.h"
 #include "support.h"
 #include "custom_fonts/FreeSansNumOnly70.h"
+#include "rtc_support.h"
 #include <Fonts/FreeSans24pt7b.h>
 #include <Fonts/FreeSans18pt7b.h>
+#include <RTClib.h>
 
 
 //
 // Created by development on 25.07.21.
 //9
 
-#define M_PI 3.1415926535897932
 #define RIN 110
 #define RIN_EMPTY 129 //empty marker
 #define ROUT 130
@@ -32,6 +33,8 @@ struct st_pwin {
     int y1;
     bool simulate;
 };
+
+extern RTC_DS3231 rtc_watch;
 
 void printText(GxEPD2_GFX &my_display, char * text, uint line) {
 
@@ -305,7 +308,7 @@ void PaintPartialWatchMin(GxEPD2_GFX &my_display, st_pwin *pwin, int min) {
 
 
 void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
-    struct tm timeinfo = {0};
+
     //Paint Time
     int16_t tbx, tby;
     uint16_t tbw, tbh;
@@ -315,12 +318,9 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
 
     display.init(0, false);
 
-    DP("Timebase for watch display - ");
-    GetTimeNowString(&timeinfo, true);
-    char strftime_buf[50];
-    strftime(strftime_buf, sizeof(strftime_buf), "%H:%M:%S", &timeinfo);
-    DP("Time:");
-    DPL(strftime_buf);
+    DateTime now = rtc_watch.now();
+    char str_format[]="hh:mm:ss";
+    String str_time_now= now.toString(str_format);
 
     display.setFont(&FreeSans70pt7b);
     display.getTextBounds("88", 0, 0, &tbx, &tby, &tbw, &tbh);
@@ -329,7 +329,7 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
     display.setPartialWindow(tx, ty, tbw, tbh + 8);
 
     display.setFont(&FreeSans18pt7b);
-    display.getTextBounds(strftime_buf, tx, ty, &sbx, &sby, &sbw, &sbh);
+    display.getTextBounds(str_time_now, tx, ty, &sbx, &sby, &sbw, &sbh);
 
     // center the bounding box by transposition of the origin:
     uint16_t x1 = ((tbw - sbw) / 2);
@@ -359,7 +359,7 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
         display.fillScreen(GxEPD_WHITE);
         display.setTextColor(GxEPD_BLACK);
         display.setCursor(tx + x1, ty + y1);
-        display.print(strftime_buf);
+        display.print(str_time_now);
     } while (display.nextPage());
 
     delay(2000);
@@ -368,44 +368,43 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
         //Paint Time
         int16_t tbx, tby;
         uint16_t tbw, tbh;
-        StreamString valueString;
-        valueString.print(timeinfo.tm_hour, 0);
+
+        String str_hour=String(now.hour());
+        DP("Print Hour:");DPL(str_hour);
+
         display.setTextColor(GxEPD_BLACK);
         display.setFont(&FreeSans70pt7b);
-        display.getTextBounds(valueString, 0, 0, &tbx, &tby, &tbw, &tbh);
+        display.getTextBounds(str_hour, 0, 0, &tbx, &tby, &tbw, &tbh);
         uint16_t x = ((display.width() - tbw) / 2) - tbx;
         uint16_t y = (display.height() * 2 / 4) + tbh / 2; // y is base line!
         display.setCursor(x, y);
-        display.print(valueString);
+        display.print(str_hour);
     } while (display.nextPage());
 }
 
 
 void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm_time) {
 
-    DPL("****** Entering Paint Watch Function");
-    display.init(0, false);
+    DateTime now = rtc_watch.now();
 
-    struct tm timeinfo = {0};
-    DP("Timebase for watch display - ");
-    GetTimeNowString(&timeinfo, true);
+    char str_format[]="hh:mm:ss - DDD, DD.MM.YYYY";
+    DP("****** Entering Paint Watch Function - Timebase:");
+    DPL(now.toString(str_format));
 
 /*    int min =min_sim;
     min_sim=min_sim+5;
     if (min_sim>60) min_sim=0;
     DP("****** MIN SIM:");DPL(min_sim);*/
 
-    int min = timeinfo.tm_min;
-    if (timeinfo.tm_sec>45 && min<59) min=min+1; //if wakeup is at 04:59 - make sure we enable the next segment
+    int min = now.minute();
+    if (now.second() && min<59) min=min+1; //if wakeup is at 04:59 - make sure we enable the next segment
 
+    display.init(0, false);
     st_pwin pwin{};
     pwin.x0 = display.width() - 1;
     pwin.y0 = display.height() - 1;
     pwin.x1 = 0;
     pwin.y1 = 0;
-
-
-
 
 //    display.init(115200, false);
 
@@ -454,15 +453,18 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
             //Paint Time
             int16_t tbx, tby;
             uint16_t tbw, tbh;
-            StreamString valueString;
-            valueString.print(timeinfo.tm_hour, 0);
+
+            String str_hour=String(now.hour());
+            DP("Print Hour:");DPL(str_hour);
             display.setTextColor(GxEPD_BLACK);
             display.setFont(&FreeSans70pt7b);
-            display.getTextBounds(valueString, 0, 0, &tbx, &tby, &tbw, &tbh);
+            display.getTextBounds(str_hour, 0, 0, &tbx, &tby, &tbw, &tbh);
             uint16_t x = ((display.width() - tbw) / 2) - tbx;
             uint16_t y = (display.height() * 2 / 4) + tbh / 2; // y is base line!
             display.setCursor(x, y);
-            display.print(valueString);
+            display.print(str_hour);
+
+
 
         }
 
