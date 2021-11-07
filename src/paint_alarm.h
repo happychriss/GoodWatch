@@ -11,13 +11,10 @@
 #include "support.h"
 
 
-#define PT18_HEIGHT 39
-#define PT18_WIDTH 32
-
-#define PT12_HEIGHT 25
-#define PT12_WIDTH 20
 
 void ProgramAlarm(GxEPD2_GFX &d );
 int DeactivateOneTimeAlarm();
+int SetNextAlarm(bool b_write_to_rtc);
+void ConfigGoodWatch(GxEPD2_GFX &d);
 
 #endif //GOODWATCH_PAINT_ALARM_H

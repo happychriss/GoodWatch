@@ -1,12 +1,19 @@
+//
+// Created by development on 05.11.21.
+//
 
-#include <WiFi.h>
-#include "WiFiCredentials.h"
-#include <lwip/apps/sntp.h>
+
+#include "wifi_support.h"
+
+
+// Wifi and Connectivity
+// Wifi and Connectivity
 
 
 
 void SetupWifi_SNTP() {
     DP("Starting Wifi");
+
     WiFi.disconnect();
     WiFi.mode(WIFI_STA);
     WiFi.begin(SSID, PASSWORD);
@@ -26,7 +33,8 @@ void SetupWifi_SNTP() {
         ESP.restart();
     }
     delay(500);
-    DPL(": DONE");
+    DPL("DONE");
+
     DP("SNT Server Setup:");
 
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
@@ -38,4 +46,20 @@ void SetupWifi_SNTP() {
     delay(500); //needed until time is available
     DPL("DONE");
 
+
+}
+
+void sendData(uint8_t *bytes, size_t count) {
+    // send them off to the server
+    //digitalWrite(LED_BUILTIN, HIGH);
+
+    HTTPClient httpClientI2S;
+
+    if(httpClientI2S.begin(I2S_SERVER_URL)) {
+        httpClientI2S.addHeader("content-type", "application/octet-stream");
+        httpClientI2S.POST(bytes, count);
+        httpClientI2S.end();
+    } else DPL("Http Client not connected!");
+
+    // digitalWrite(LED_BUILTIN, LOW);
 }

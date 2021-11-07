@@ -8,7 +8,7 @@
 #include "support.h"
 #include <global_hardware.h>
 
-#include <RTClib.h>
+#include <my_RTClib.h>
 #include <global_display.h>
 
 extern RTC_DS3231 rtc_watch;
@@ -63,7 +63,7 @@ void rtcInit() {
     rtc_watch.writeSqwPinMode(DS3231_OFF);
     rtc_watch.disable32K();
 
-
+    DPL("RTC Init: OK");
 }
 
 void rtcSetRTCFromInternet() {
@@ -85,3 +85,13 @@ void rtsSetEspTime(DateTime dt) {
     tv.tv_usec = 0;  // keine Mikrosekunden setzen
     settimeofday(&tv, NULL);
 }
+
+
+/**************************************************************************/
+/*!
+    @brief  Get the current date/time
+    @return DateTime object with the current date/time
+*/
+/**************************************************************************/
+static uint8_t bcd2bin(uint8_t val) { return val - 6 * (val >> 4); }
+

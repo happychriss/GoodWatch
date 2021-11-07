@@ -7,24 +7,21 @@
 #include "edgeimpulse/ff_command_set_inference.h"
 #include "inference_sound.hpp"
 #include "driver/i2s.h"
-#include <RTClib.h>
-#include "rtc_support.h"
+#include <my_RTClib.h>
 #include "global_display.h"
+#include "paint_support.h"
 #include <rtc_support.h>
+#include <paint_support.h>
+#include <ArduinoOTA.h>
 
 
-
-//  { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "j", "n" };
-#define ANSWER_YES 10
-#define ANSWER_NO 11
-#define ANSWER_SET 9
-
+// days start Sunday
 struct str_watch_config wc[ALARM_NUMBERS_DISPLAY] = {
-        {{1, 1, 1, 1, 1, 1, 1}, single,    3}, // every day of the week
-        {{1, 1, 1, 1, 1, 1, 1}, single,    4}, // every day of the week
-        {{0, 0, 0, 1, 1, 1, 1}, repeating, 6}, // MO-FR
-        {{0, 1, 1, 1, 1, 1, 0}, repeating, 7},  // MO-FR
-        {{0, 1, 1, 1, 1, 1, 0}, bike,      9}, // Bike MO-FR
+        {{1, 1, 1, 1, 1, 1, 1}, single,    3*PT12_HEIGHT,"Einmal-1"}, // every day of the week
+        {{1, 1, 1, 1, 1, 1, 1}, single,    4*PT12_HEIGHT,"Einmal-2"}, // every day of the week
+        {{0, 0, 0, 1, 1, 1, 1}, repeating, 5*PT12_HEIGHT+PT12_BREAK,"MO-FR-1"}, // MO-FR
+        {{0, 1, 1, 1, 1, 1, 0}, repeating, 6*PT12_HEIGHT+PT12_BREAK, "MO-FR-2"},  // MO-FR
+        {{0, 1, 1, 1, 1, 1, 0}, bike,      7*PT12_HEIGHT+2*PT12_BREAK,"Bike"}, // Bike MO-FR
 
 };
 
@@ -35,16 +32,18 @@ extern RTC_DS3231 rtc_watch;
 extern RtcData rtcData;
 
 
-// This functions checks for an alarm, if it should be set for the next day..
-DateTime CorrectNextDay(DateTime input_time, int i) {
+// This functions checks for an alarm, if it should be set for the next day depending on the alarm type
+
+DateTime DetermineNextAlarmDay(int alarm_type_index, int hour, int min) {
+    DateTime tmp_now = rtc_watch.now();
+    DateTime input_time = DateTime(tmp_now.year(), tmp_now.month(), tmp_now.day(), hour, min);
 
     DPL("** Correct Time **");
-    DPF("Input Time[%i]: ", i);
+    DPF("Input Time[%i]: ", alarm_type_index);
     DPL(DateTimeString(input_time));
 
     DateTime res = input_time;
 
-    DateTime tmp_now = rtc_watch.now();
     int curr_day = tmp_now.dayOfTheWeek();
 
     int next_day = curr_day + 1;
@@ -52,8 +51,8 @@ DateTime CorrectNextDay(DateTime input_time, int i) {
 
     if (input_time <= tmp_now) {
         for (int c = 1; c < 8; c++) {
-            DPF("i: %i c: %i, next_day: %i, watch_config: %i\n", i, c, next_day, wc[i].days[next_day]);
-            if (wc[i].days[next_day] == 1) {
+            DPF("i: %i c: %i, next_day: %i, watch_config: %i\n", alarm_type_index, c, next_day, wc[alarm_type_index].days[next_day]);
+            if (wc[alarm_type_index].days[next_day] == 1) {
                 res = input_time + TimeSpan(c * 24 * 60 * 60);
                 break;
             }
@@ -77,24 +76,28 @@ int SortTimes(void const *a, void const *b) {
 int DeactivateOneTimeAlarm() {
 
     DateTime tmp_now = rtc_watch.now();
-    DP("Check alarm to deactivate, base time: ");DPL(DateTimeString(tmp_now));
+    DP("Check alarm to deactivate, base time: ");
+    DPL(DateTimeString(tmp_now));
 
-    int index=-1;
+    int index = -1;
     for (int i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
-        if (rtcData.d.alarms[i].active && wc[i].type==single) {
+        if (rtcData.d.alarms[i].active && wc[i].type == single) {
             DPF("Checking [%i]: %s:", i, rtcData.str_short(i).c_str());
-            if (rtcData.d.alarms[i].time == tmp_now) {
-                DPL("Found");
-                index=i;
+
+            if ((rtcData.d.alarms[i].time - tmp_now).seconds() < 60) {
+                DPL("Found and deactivated");
+                index = i;
+                rtcData.d.alarms[i].active = false;
                 break;
-            } else DPL("-");
+            } else
+                DPL("-");
         }
 
     }
     return index;
 }
 
-int GetNextAlarmIndex() {
+int SetNextAlarm(bool b_write_to_rtc) {
     int i;
     DateTime tmp_now = rtc_watch.now();
 
@@ -105,121 +108,56 @@ int GetNextAlarmIndex() {
     qsort(rtcData.d.alarms, ALARM_NUMBERS_DISPLAY, sizeof(strct_alarm), SortTimes);
     DPL("PostSort:");
     for (int i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
-        DPF("RTC Alarm[%i]: %s\n", i, rtcData.str_long(i).c_str());
+        DPF("RTC Alarm[%i]: %s - State: %i\n", i, rtcData.str_long(i).c_str(), rtcData.d.alarms[i].active);
     }
 
     // Find first relevant alarm
-    int active_alarm = -1;
-
+    int next_alarm = -1;
 
     for (i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
         if ((rtcData.d.alarms[i].active) && (rtcData.d.alarms[i].time > tmp_now)) {
-            active_alarm = i;
+            next_alarm = i;
             break;
         }
     }
-    DPF("Next active alarm [%i]: %s\n", i, rtcData.str_short(i).c_str());
 
-    return active_alarm;
+    if (b_write_to_rtc) {
+        if (next_alarm >= 0) {
+            DPF("Next active alarm [%i]: %s\n", next_alarm, rtcData.str_short(next_alarm).c_str());
+            DateTime alarm = rtcData.d.alarms[next_alarm].time;
+            DPF("************ Setting Alarm[%i]: ", next_alarm);
+            DPL(DateTimeString(alarm));
+            if (!rtc_watch.setAlarm2(alarm, DS3231_A2_Date)) {
+
+                DPL("!!!!!!!! ERROR SETTING ALARM");
+                next_alarm = -1;
+            }
+        } else {
+            DPL("************ No active alarm");
+            rtc_watch.clearAlarm(ALARM2_ALARM);
+            rtc_watch.disableAlarm(ALARM2_ALARM);
+
+        }
+    }
+    return next_alarm;
 
 }
 
 
-DateTime updateAlarmTime(const char *str_alarm, int i) {
+DateTime updateAlarmTime(const char *str_alarm, int alarm_typ_index) {
     DateTime tmp_time;
     int alarm_hour = ((int) str_alarm[0] - '0') * 10 + (int) str_alarm[1] - '0';
     int alarm_min = ((int) str_alarm[3] - '0') * 10 + (int) str_alarm[4] - '0';
     DPF("Wake up on: %i:%i\n", alarm_hour, alarm_min);
-    DateTime tmp_now = rtc_watch.now();
-    tmp_time = DateTime(tmp_now.year(), tmp_now.month(), tmp_now.day(), alarm_hour, alarm_min);
-    return CorrectNextDay(tmp_time, i);
+
+    return DetermineNextAlarmDay(alarm_typ_index, alarm_hour, alarm_min);
 
 }
 
 void PaintAlarmScreen(GxEPD2_GFX &d, const char title[]);
 
 
-void PL(GxEPD2_GFX &d, int line, int column, String text, bool b_partial, bool b_clear) {
-
-
-    int lh = PT12_HEIGHT; //height of a line
-
-    int ox = PT12_HEIGHT / 4; //offset from border
-    int oy = PT12_HEIGHT / 4;
-
-    int x = ox + column * PT12_WIDTH;
-    int y = oy + line * lh;
-
-
-    if (b_partial) {
-
-        DPF("Partial Print line: %i, column:%i, Text: %s\n", line, column, text.c_str());
-        int16_t tbx, tby;
-        uint16_t tbw, tbh;
-        d.getTextBounds(text.c_str(), 0, 0, &tbx, &tby, &tbw, &tbh);
-
-        if (text.length() == 0 or b_clear) {
-            b_clear = true;
-            tbw = MAX_X - x;
-            DPL("....clear text");
-        } else {
-            tbw = tbw + PT12_WIDTH;
-        }
-
-        d.setPartialWindow(x, y - PT12_HEIGHT, tbw, PT12_HEIGHT + 6);
-        d.firstPage();
-        do {
-            d.setCursor(x, y);
-            if (b_clear) d.fillRect(x, y - PT12_HEIGHT, tbw, MAX_X - x, GxEPD_WHITE);
-            d.print(text.c_str());
-        } while (d.nextPage());
-    } else {
-        d.setCursor(x, y);
-        d.print(text.c_str());
-    }
-
-}
-
 //***************************************************************************************************************+
-
-
-
-
-
-// just a trick to skip the ":" in the time string and convert from tx to index in the string
-int si(int tx) {
-    int tmp_tx = tx;
-    if (tx > hour2) tmp_tx++;
-    tmp_tx--;
-    return tmp_tx;
-}
-
-bool BuildTimeString(const int tx, int value, char *time) {
-
-    bool b_valid = true;
-    char label = value + '0';
-
-    if ((value == ANSWER_NO) || (value == ANSWER_YES)) {
-        label = EMPTY_PROMPT;
-    }
-
-    // smaller 9 means, I am a number and not a command
-    if (value < 10) {
-        if ((tx == hour1 && value > 2) || (tx == min1 && value > 5) || ((tx == hour2) && ((time[0] - '0') * 10 + value > 24))) {
-            label = ERROR_CHAR;
-            b_valid = false;
-        }
-    }
-
-    time[si(tx)] = label;
-
-    // Clean up all previos value
-    for (int i = tx + 1; i <= min2; i++) {
-        time[si(i)] = EMPTY_PROMPT;
-    }
-
-    return b_valid;
-}
 
 
 void ProgramAlarm(GxEPD2_GFX &d) {
@@ -235,166 +173,188 @@ void ProgramAlarm(GxEPD2_GFX &d) {
 
     InitVoiceCommands();
 
-    do {
-        PaintAlarmScreen(d, "An/Aus [1..6] - Set [9]");
+    PaintAlarmScreen(d, "An/Aus [1..6] - Set [9]");
 
-        char time_str[7] = TIME_EMPTY;
-        bool b_valid_time = false;
-        int value_idx = 0;
-        int selected_alarm = 0;
+    char time_str[7] = TIME_EMPTY;
+    bool b_valid_time = false;
+    bool b_menu_loop = true;
+    int value_idx = 0;
+    int selected_alarm = 0;
+
+    // main menu loop
+    do {
 
         value_idx = GetVoiceCommand();
 
-        if (value_idx == ANSWER_SET) {
+        if (value_idx==ANSWER_NO) b_menu_loop=false;
 
-            //**************************************************************************************
-            // ****************** Activate Alarms ************************************************++
-            //**************************************************************************************
+        if ((value_idx <= ALARM_NUMBERS_DISPLAY) && (value_idx>=1)) {
+
+            /*          *************************************************************************************
+                        ****************** Activate Alarms ************************************************++
+                        ***************************************************************************************/
 
             DPL("************+ Activate, switch alarm on/off");
-            PL(d, MESSAGE_LINE, MESSAGE_ANSWER_COLUMN, "An/Aus [1..5]", true, true);
+            PL(d, MESSAGE_LINE, 1, "An/Aus [1..5]", true, true);
+            PL(d, CONFIRM_LINE, 1, "Fertig? [ja]", true, true);
 
-            while (true) {
-                value_idx = GetVoiceCommand();
-                if (value_idx == ANSWER_YES) {
-                    break;
-                }
-                if (value_idx <= ALARM_NUMBERS_DISPLAY) {
-                    rtcData.d.alarms[value_idx].active = !rtcData.d.alarms[value_idx].active;
-                    if (rtcData.d.alarms[value_idx].active) {
-                        PL(d, wc[value_idx - 1].dl, WAKE_HOURS_COLUMN, "( off )", true, true);
-                    } else {
+            bool b_valid_switch = false;
 
-                        DateTime alarm = rtcData.d.alarms[value_idx - 1].time;
-                        TimeSpan diff_time = alarm - rtc_watch.now();
-
-                        char str_wakeup[50];
-                        sprintf(str_wakeup, "(%ih %imin)", diff_time.hours() + (24 * diff_time.days()), diff_time.minutes());
-                        PL(d, wc[value_idx - 1].dl, WAKE_HOURS_COLUMN, str_wakeup, true, true);
-
-                        DP("Resultstring:");
-                        DP(str_wakeup);
-                        DPL("<-END");
-
-                    }
-
-                }
-            }
-
-
-        } else if (value_idx <= ALARM_NUMBERS_DISPLAY) {
-
-            selected_alarm = value_idx - 1;
-            DPF("************+ Change Alarm Time for alarm:%i\n", selected_alarm);
-
-            //**************************************************************************************
-            // ****************** Change Alarms on Display ***************************************++
-            //**************************************************************************************
-
-            // Clear old time from Display
-            PL(d, wc[selected_alarm].dl, TIME_COLUMN, TIME_START, true, true);
-
-            int tx = hour1;
-            int tx_old;
+            // loop for setting different alarms
 
             do {
-                tx_old = tx;
+                if (1< value_idx < ALARM_NUMBERS_DISPLAY) {
 
-                value_idx = GetVoiceCommand();
+                    selected_alarm = value_idx - 1;
 
-                if (value_idx == ANSWER_NO) {
-                    tx--;
-                    if (tx > leave) BuildTimeString(tx, INPUT_PROMPT - '0', time_str);
-                } else {
+                    if (rtcData.d.alarms[selected_alarm].valid) {
 
-                    if (BuildTimeString(tx, value_idx, time_str)) {
-                        // Answer was valid, next step - otherwhise stay at the same character
-                        tx++;
-                        if (tx < done) BuildTimeString(tx, INPUT_PROMPT - '0', time_str);
+                        b_valid_switch = true;
+                        DPF("Toggle Alarm[%i]: %s\n:",selected_alarm,wc[selected_alarm].alarm_name.c_str());
+                        // toggle the alarms
+                        rtcData.d.alarms[selected_alarm].active = !rtcData.d.alarms[selected_alarm].active;
+
+                        if (!rtcData.d.alarms[selected_alarm].active) {
+                            PL(d, wc[selected_alarm].dl, WAKE_HOURS_COLUMN, OFF_STRING, true, true);
+                        } else {
+
+                            // Get the current alarm time and determine the next valid alarm day -- very important
+                            DateTime alarm = rtcData.d.alarms[selected_alarm].time;
+                            rtcData.d.alarms[selected_alarm].time=DetermineNextAlarmDay(selected_alarm,alarm.hour(),alarm.minute());
+
+                            char str_wakeup[50]={};
+                            HoursUntilAlarm(rtcData.d.alarms[selected_alarm].time,str_wakeup);
+
+                            PL(d, wc[selected_alarm].dl, WAKE_HOURS_COLUMN, str_wakeup, true, true);
+
+                            DP("Resultstring:");
+                            DP(str_wakeup);
+                            DPL("<-END");
+
+                        }
+                    } else {
+                        DPL("!!!! Invalid Alarm entered!!!");
                     }
                 }
 
-                DPF("State: %i -> %i VoiceCommand: %i  - TimeString:%s \n", tx_old, tx, value_idx, time_str);
-                PL(d, wc[selected_alarm].dl, TIME_COLUMN, time_str, true, true);
+                if (b_valid_switch) {
+                    DPL("Changed Alarm Switch - updating RTC Data");
+                    rtcData.writeRTCData();
+                }
 
-            } while ((tx != done) && (tx != leave));
-            if (tx == done) b_valid_time = true;
-        } else {
-            DPL("Input validation - ERROR");
+                value_idx = GetVoiceCommand();
+                if (value_idx == ANSWER_YES) {
+                    b_menu_loop=false;
+                }
+
+
+
+            } while (b_menu_loop);
+
+
+            /*   **************************************************************************************
+                 ****************** Change a specific Alarms on Display ****************************++
+                ***************************************************************************************/
+
         }
 
-        //**************************************************************************************
-        // ****************** Update RTC Clock ***************************************++
-        //**************************************************************************************
+        if (value_idx == ANSWER_SET) {
+            PL(d, MESSAGE_LINE, 1, "Set[1..5]", true, true);
 
-        if (b_valid_time) {
+            do {
+                value_idx = 99;
+                while (value_idx > ALARM_NUMBERS_DISPLAY) {
+                    value_idx = GetVoiceCommand();
+                    if (value_idx == ANSWER_NO) {
+                        b_menu_loop=false;
+                    }
+                }
+                // value_idx is a selected alarm now
 
-            rtcData.d.alarms[selected_alarm].time = updateAlarmTime(time_str, selected_alarm);
-            rtcData.d.alarms[selected_alarm].active = true;
-            rtcData.d.alarms[selected_alarm].valid = true;
-            DPF("Final Alarm Time: %s\n", rtcData.str_long(selected_alarm).c_str());
+                selected_alarm = value_idx - 1;
+                DPF("************+ Change Alarm Time for alarm:%i\n", selected_alarm);
+                DPF("Change Alarm Time[%i]: %s\n:",selected_alarm,wc[selected_alarm].alarm_name.c_str());
+                // Clear old time from Display
+                PL(d, wc[selected_alarm].dl, TIME_COLUMN, TIME_START, true, true);
 
-            rtcData.writeRTCData();
-            b_valid_time = false;
+                int tx = hour1, tx_old;
+
+                /* Update a selected alarm */
+
+                do {
+                    tx_old = tx;
+                    value_idx = GetVoiceCommand();
+
+                    if (value_idx == ANSWER_NO) {
+                        tx--;
+                        if (tx > leave) BuildTimeString(tx, INPUT_PROMPT - '0', time_str);
+                    } else {
+
+                        if (BuildTimeString(tx, value_idx, time_str)) {
+                            // Answer was valid, next step - otherwhise stay at the same character
+                            tx++;
+                            if (tx < done) BuildTimeString(tx, INPUT_PROMPT - '0', time_str);
+                        }
+                    }
+
+                    DPF("State: %i -> %i VoiceCommand: %i  - TimeString:%s \n", tx_old, tx, value_idx, time_str);
+                    PL(d, wc[selected_alarm].dl, TIME_COLUMN, time_str, true, true);
+
+                } while ((tx != done) && (tx != leave));
+                if (tx == done) b_valid_time = true;
+
+
+                //**************************************************************************************
+                // ****************** Update RTC Clock ***************************************++
+                //**************************************************************************************
+
+                if (b_valid_time) {
+
+                    rtcData.d.alarms[selected_alarm].time = updateAlarmTime(time_str, selected_alarm);
+                    rtcData.d.alarms[selected_alarm].active = true;
+                    rtcData.d.alarms[selected_alarm].valid = true;
+                    DPF("Final Alarm Time: %s\n", rtcData.str_long(selected_alarm).c_str());
+
+                    rtcData.writeRTCData();
+                    b_valid_time = false;
+                }
+
+                //**************************************************************************************
+                // ***************** Are we done? ************************************************
+
+                PL(d, CONFIRM_LINE, 1, "Fertig? [ja/nein]", true, true);
+                value_idx = GetVoiceCommand();
+                if (value_idx == ANSWER_NO) {
+                    PL(d, CONFIRM_LINE, 1, "", true, true);
+
+                } else {
+                    b_menu_loop=false;
+                }
+            } while (b_menu_loop); // end of alarm updating loop, that could result in changed alarms.
+
+
+
+            /*        // schedule an alarm 10 seconds in the future
+                    if(!rtc_watch.setAlarm1(
+                            rtc_watch.now() + TimeSpan(10),
+                            DS3231_A1_Second // this mode triggers the alarm when the seconds match. See Doxygen for other options
+                            )) {
+                        DPL("Error, alarm wasn't set!");
+                        PL(d, CONFIRM_LINE, 1, "Error Setting Alarm", true, true);
+                        delay(10000);
+                    }else {
+                        DPL("Alarm will happen in 10 seconds!");
+                    }*/
         }
 
-        //**************************************************************************************
-        // ***************** Are we done? ************************************************
+    } while (b_menu_loop);
 
-        PL(d, CONFIRM_LINE, 1, "Fertig? [ja/nein]", true, true);
-        DPL("done - PL");
-        value_idx = GetVoiceCommand();
-//        int value_idx=ANSWER_YES;
-        DPL("done - GetVoice");
-        if (value_idx == ANSWER_NO) {
-            PL(d,
-               CONFIRM_LINE, 1, "", true, true);
+    SetNextAlarm(true); // determines next alarm and writes it into RTC
 
-        } else {
-            break;
-        }
+    microphone_inference_end();
 
-
-    } while (true);
-
-
-    rtc_watch.clearAlarm(1);
-    rtc_watch.clearAlarm(2);
-    rtc_watch.disableAlarm(1);
-
-/*        // schedule an alarm 10 seconds in the future
-        if(!rtc_watch.setAlarm1(
-                rtc_watch.now() + TimeSpan(10),
-                DS3231_A1_Second // this mode triggers the alarm when the seconds match. See Doxygen for other options
-                )) {
-            DPL("Error, alarm wasn't set!");
-            PL(d, CONFIRM_LINE, 1, "Error Setting Alarm", true, true);
-            delay(10000);
-        }else {
-            DPL("Alarm will happen in 10 seconds!");
-        }*/
-
-    int next_alarm = GetNextAlarmIndex();
-
-    if (next_alarm >= 0) {
-        DateTime alarm = rtcData.d.alarms[next_alarm].time;
-        DPF("************ Setting Alarm[%i]: ", next_alarm);
-        DPL(DateTimeString(alarm));
-
-        if (!rtc_watch.setAlarm2(alarm, DS3231_A2_Date
-        )) {
-
-            DPL("!!!!!!!! ERROR SETTING ALARM");
-            PL(d,
-               CONFIRM_LINE, 1, "Error Setting Alarm", true, true);
-            delay(10000);
-            return;
-        }
-
-        microphone_inference_end();
-
-    }
 }
+
 
 void PLAlarm(GxEPD2_GFX &d, int index, String print_text, bool b_partial, bool b_clear) {
 
@@ -402,11 +362,12 @@ void PLAlarm(GxEPD2_GFX &d, int index, String print_text, bool b_partial, bool b
     PL(d, wc[index].dl, TIME_COLUMN, rtcData.str_short(index), b_partial, b_clear);
 
     if ((rtcData.d.alarms[index].active) && (rtcData.d.alarms[index].valid)) {
-        TimeSpan diff_time = rtcData.d.alarms[index].time - rtc_watch.now();
         char str_wakeup[50] = {0};
-        sprintf(str_wakeup, "(%ih %imin)", diff_time.hours(), diff_time.minutes());
+        HoursUntilAlarm(rtcData.d.alarms[index].time,str_wakeup);
         PL(d, wc[index].dl, WAKE_HOURS_COLUMN, str_wakeup, b_partial, b_clear);
         DPF("Active alarm[%i] with:%s\n", index, str_wakeup);
+    } else {
+        PL(d, wc[index].dl, WAKE_HOURS_COLUMN, OFF_STRING, b_partial, b_clear);
     }
 
 }
@@ -430,5 +391,97 @@ void PaintAlarmScreen(GxEPD2_GFX &d, const char title[]) {
 
 
     } while (d.nextPage());
+
+
+
+}
+
+
+void ConfigGoodWatch(GxEPD2_GFX &d) {
+
+    InitVoiceCommands();
+
+    d.refresh();
+    d.init(0, false);
+    d.setFont(&FreeSans12pt7b);
+    d.firstPage();
+
+    int adc = analogRead(BATTERY_VOLTAGE);
+    double BatteryVoltage;
+    BatteryVoltage = (adc * 7.445) / 4096;
+    DP("Battery V: ");
+    DPL(BatteryVoltage);
+    char battery[30]={};
+    sprintf(battery,"Battery: %.2fV",BatteryVoltage);
+
+    do {
+        //        display.setCursor(x1, y1);
+        d.fillScreen(GxEPD_WHITE);
+        d.setTextColor(GxEPD_BLACK);
+
+        PL(d, MESSAGE_LINE, 1, "Welcome - GoodWatch", false, true);
+        PL(d, 3*PT12_HEIGHT,1, "1: Record Sound", false, true);
+        PL(d, 4*PT12_HEIGHT,1, "2: OTA Update", false, true);
+        PL(d, 6*PT12_HEIGHT,1, battery, false, true);
+
+    } while (d.nextPage());
+
+    int value_idx = GetVoiceCommand();
+
+    if (value_idx==1) {
+        DPL("Start Recording - sending to server!!!");
+        PL(d, 3*PT12_HEIGHT, 1, "!! Recording !!", true, true);
+        PL(d, 4*PT12_HEIGHT, 1, "!! Reset to stop !!", true, true);
+        if (microphone_inference_start(EI_CLASSIFIER_SLICE_SIZE) == false) {
+            ei_printf("ERR: Failed to setup audio sampling\r\n");
+        }
+        VoiceAcquisitionTEST();
+    }
+
+    if (value_idx==2) {
+        DPL("Start OTA Update!!!");
+        ArduinoOTA
+        .onStart([]() {
+            String type;
+            if (ArduinoOTA.getCommand() == U_FLASH)
+                type = "sketch";
+            else // U_SPIFFS
+            type = "filesystem";
+
+            // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+            Serial.println("Start updating " + type);
+        })
+        .onEnd([]() {
+            Serial.println("\nEnd");
+        })
+        .onProgress([](unsigned int progress, unsigned int total) {
+            Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+        })
+        .onError([](ota_error_t error) {
+            Serial.printf("Error[%u]: ", error);
+            if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+            else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+            else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+            else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+            else if (error == OTA_END_ERROR) Serial.println("End Failed");
+        });
+
+        DPL("OTA Update Ready!!!");
+
+        PL(d, 3*PT12_HEIGHT, 1, "OTA Update ready on:", true, true);
+        PL(d, 4*PT12_HEIGHT, 1, WiFi.localIP().toString(), true, true);
+        PL(d, 6*PT12_HEIGHT, 1, "!! Reset to stop !!", true, true);
+
+        if (microphone_inference_start(EI_CLASSIFIER_SLICE_SIZE) == false) {
+            ei_printf("ERR: Failed to setup audio sampling\r\n");
+        }
+
+        ArduinoOTA.begin();
+        while (true) {
+            DPL("OTA UPDATE");
+            ArduinoOTA.handle();
+            delay(1000);
+        }
+    }
 
 }

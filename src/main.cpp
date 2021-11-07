@@ -1,15 +1,17 @@
 #define ENABLE_GxEPD2_GFX 1
-
 #include <Arduino.h>
+#include "WiFi.h"
 #include <time.h>
-#include <RTClib.h>
 #include "support.h"
 #include <global_hardware.h>
 #include "driver/i2s.h"
+#include "paint_alarm.h"
+#include <my_RTClib.h>
+#include <ArduinoOTA.h>
 
 // various
 
-#include "data_acquisition.h"
+
 #include <lwip/apps/sntp.h>
 #include "Audio.h"
 
@@ -17,17 +19,20 @@
 #include <display_support.hpp>
 #include <apds_support.hpp>
 #include <audio_support.hpp>
-#include <wifi_support.hpp>
 #include <rtc_support.h>
 
+#include <wifi_support.h>
 #include <support.h>
 #include <paint_watch.h>
 #include <paint_alarm.h>
+#include <esp_wifi.h>
 
 
-#undef DATA_ACQUISITION
+// #define DATA_ACQUISITION -> check in file support.h
 #undef DISABLE_EPD
+#define DATA_ACQUISITION
 
+//todo: SparkFun_APDS9960_H - moved some functions from private to public
 
 //********** Global Variables ***************************************************
 // Wake Up Sensor
@@ -48,9 +53,7 @@ bool debug_nn = false; // Set this to true to see e.g. features generated from t
 QueueHandle_t m_i2sQueue;
 
 
-// Wifi and Connectivity
-WiFiClient *wifiClientI2S = nullptr;
-HTTPClient *httpClientI2S = nullptr;
+
 
 // Audio playing with SD Card
 bool b_audio_end_of_mp3 = false;
@@ -78,7 +81,7 @@ void IRAM_ATTR Ext_INT1_ISR() {
 void setup() {
 
     Serial.begin(115200);
-    DPL("********** SETUP ***************");
+    DPL("****** SETUP ***************");
 
     // Setup pin input and output
     pinMode(LED_BUILTIN, OUTPUT);
@@ -86,13 +89,19 @@ void setup() {
     pinMode(DISPLAY_CONTROL, OUTPUT);
     pinMode(DISPLAY_AND_SOUND_POWER, OUTPUT);
     pinMode(BATTERY_VOLTAGE, INPUT);
+    pinMode(RTC_INT, INPUT_PULLUP);
     digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
     digitalWrite(DISPLAY_CONTROL, LOW);
 
-    rtcInit();
-    // Set timezone to Berlin Standard Time
-    setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
-    tzset();
+    // https://github.com/espressif/esp-idf/blob/bcbef9a8db54d2deef83402f6e4403ccf298803a/examples/storage/nvs_rw_blob/main/nvs_blob_example_main.c
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // NVS partition was truncated and needs to be erased
+        // Retry nvs_flash_init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( err );
 
 }
 
@@ -106,21 +115,48 @@ void loop() {
 
     DPL("****** Main Loop ***********");
     wakeup_reason = print_wakeup_reason();
+
+    // initializing the rtc
+    if(!rtc_watch.begin()) {
+        Serial.println("Couldn't find RTC!");
+        Serial.flush();
+        abort();
+    }
+    DPL("RTC Init: OK");
+
+    // Set timezone to Berlin Standard Time
+    setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
+    tzset();
+
     int adc = analogRead(BATTERY_VOLTAGE);
     double BatteryVoltage;
     BatteryVoltage = (adc * 7.445) / 4096;
     DP("Battery V: ");
     DPL(BatteryVoltage);
 
-    // Normal Boot **************************************************************************
+
+    /*
+        // **********************************************************************************************
+        // Normal Boot **********************************************************************************
+        // **********************************************************************************************
+    */
+
     if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
-        DPL("!!!! Normal Boot - Time Setup");
+        DPL("!!!! ****** Boot ******  !!!!");
+        // stop oscillating signals at SQW Pin
+        // otherwise setAlarm1 will fail
         SetupWifi_SNTP();
+
+        rtc_watch.writeSqwPinMode(DS3231_OFF);
+        rtc_watch.disable32K();
+        rtc_watch.clearAlarm(ALARM1_5_MIN);
+        rtc_watch.clearAlarm(ALARM2_ALARM);
         rtcSetRTCFromInternet();
+        DPF("RTC Init with Temperature: %f\n",rtc_watch.getTemperature()); // in Celsius degree
         PaintWatch(display, false, false);
     } else {
         // Check RTC  Clock ****************************************************************
-        DPL("!!!! Not booting - Time Setup");
+        DPL("!!!! ****** Wakeup ****** !!!!");
         if (rtc_watch.lostPower()) {
             DPL("!!!!!RTC Watch lost power - Reset from Internet");
             SetupWifi_SNTP();
@@ -131,8 +167,13 @@ void loop() {
 
     }
 
-#define ALARM1_5_MIN 1
-#define ALARM2_ALARM 2
+
+/*
+    // **********************************************************************************************
+    // Alarm Clock Wakeup ***************************************************************************
+    // **********************************************************************************************
+*/
+
 
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
         DPL("!!!! RTC Alarm Clock Wakeup");
@@ -146,15 +187,19 @@ void loop() {
             PaintWatch(display, true, false);
         }
 
-
         if (rtc_watch.alarmFired(ALARM2_ALARM)) {
-            DPL("*** Alarm2 Fired: ALARM for Wakup");
+            DPL("*** Alarm2 Fired: ALARM for Wakeup");
             rtc_watch.clearAlarm(ALARM2_ALARM);
             rtc_watch.disableAlarm(ALARM2_ALARM);
+            rtcData.getRTCData();
+
             DeactivateOneTimeAlarm();
+            SetNextAlarm(true);
+            rtcData.writeRTCData();
 
             digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
             //        pinMode(GPIO_NUM_34, INPUT_PULLUP);
+            delay(1000);
             attachInterrupt(GPIO_NUM_34, Ext_INT1_ISR, HIGH);
             InitAudio();
             //    SerialKeyWait();
@@ -182,6 +227,8 @@ void loop() {
                 delay(100);
             }
 
+            PaintWatch(display, false, false);
+
         };
 
 
@@ -189,9 +236,12 @@ void loop() {
 
     }
 
-    // Proxi Hand Movement **************************************************************************
+ /*   // **********************************************************************************************
+    // PIR Sensor Wakeup*****************************************************************************
+    // ***********************************************************************************************/
+
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-        DPL("!!!! PIR Sensor Wakeup");
+        DP("!!!! PIR Sensor Wakeup with ");
 
         // Initialize APDS-9960 (configure I2C and initial values)
         apds.init();
@@ -201,33 +251,43 @@ void loop() {
         uint16_t light_value = 0;
         uint8_t proximity_data = 0;
         uint16_t ambient_light = 0;
+        delay(120);
 
-        for (int i = 0; i < 70; i++) {
-            // Read the proximity value
-            apds.readProximity(proximity_data);
-            apds.readAmbientLight(ambient_light);
-/*
-            DP(i);
-            DP("-");
-            DP(proximity_data);
-            DP("-");
-            DPL(ambient_light);*/
+            for (int i = 0; i < 7; i++) {
+                // Read the proximity value
+                apds.readProximity(proximity_data);
+                apds.readAmbientLight(ambient_light);
+//              DP(i); DP("-"); DP(proximity_data); DP("-"); DPL(ambient_light);
+                // Read the light levels (ambient, red, green, blue)
+            }
 
-            // Read the light levels (ambient, red, green, blue)
-        }
+        DPF("Proximity: %i\n",proximity_data);
 
         if (ambient_light == 0) {
             digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
             pwm_up_down(true, pwmtable_16, 256 / 4, 50);
         }
 
-        if (proximity_data > 130) { //hand is very close
-            ProgramAlarm(display);
+/*        // **********************************************************************************************
+        // VERY CLOSE - Data Acuisition and OTA Update **************************************************
+        // ***********************************************************************************************/
+
+        if (proximity_data > 200) { //hand is very close
+            DPL("Proximity-Check: Very close");
+            SetupWifi_SNTP();
+            ConfigGoodWatch(display);
             PaintWatch(display, false, false);
-        } else if (proximity_data > 20) { //hand a bit away
+        } else if (proximity_data > 45) { //hand a bit away
+
+/*            // **********************************************************************************************
+            // Medium Close - Show Alarm Screen ********** **************************************************
+            // ***********************************************************************************************/
+
+            DPL("Proximity-Check: A bit away");
             ProgramAlarm(display);
             PaintWatch(display, false, false);
         } else {
+            DPL("Proximity-Check: No Hand");
             PaintQuickTime(display, false);
         }
 
@@ -248,45 +308,17 @@ void loop() {
         }
 
     }
-/*    // 5 min Watch Refresh  **************************************************************************
-    if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER) {
-        DPL("!!! RTC Wakeup after 5min");
-
-        if (rtc_watch.alarmFired(1)) {
-            DPL("*** Alarm1 Fired");
-        };
-
-        if (rtc_watch.alarmFired(2)) {
-            DPL("*** Alarm2 Fired");
-        };
-
-        rtc_watch.clearAlarm(1);
-        rtc_watch.clearAlarm(2);
-        rtc_watch.disableAlarm(1);
-        rtc_watch.disableAlarm(2);
-
-        rtsSetEspTime(rtc_watch.now());
-        PaintWatch(display, true, false);
-    }*/
 
 
-    // ************ Deep Sleep *******************************
+/*    // **********************************************************************************************
+    // DEEP SLEEP ***********************************************************************************
+    // ***********************************************************************************************/
+
+
     Serial.println("Prepare deep sleep");
     apds_init_proximity();
 //    apds.clearProximityInt();
 
-#define SLEEP_SEC (5*60)
-
-    /*   int sleep_sec = SLEEP_SEC - ((dt.second() + dt.minute() * 60) % SLEEP_SEC);
-
-       if (sleep_sec == 0) sleep_sec = sleep_sec;
-       DP("Going to sleep now for (min/sec):");
-       DP(sleep_sec / 60);
-       DP(":");
-       DPL(sleep_sec % 60);
-       DP("Sleep Sec:");
-       DPL(sleep_sec);
-   */
     digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
 
 //    esp_sleep_enable_timer_wakeup(sleep_sec * 1000 * 1000);
@@ -294,16 +326,21 @@ void loop() {
     int next_wake_up_min = (((dt.minute()) / 5) * 5) + 5;
     if (next_wake_up_min == 60) next_wake_up_min = 0;
     DateTime alarm(0, 0, 0, 0, next_wake_up_min, 0);
+    DPF("Next wakeup min: %i\n",next_wake_up_min);
     rtc_watch.setAlarm1(alarm, DS3231_A1_Minute);
+
+    //ext0 allows you to wake up the ESP32 using one single GPIO pin;
+    //ext1 allows you to wake up the ESP32 using several GPIO pins.
+    // Alarm from RTC
+    esp_sleep_enable_ext1_wakeup(0x8000000000, ESP_EXT1_WAKEUP_ALL_LOW); //1 = High, 0 = Low
 
     // Alarm from PIR
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_34, HIGH); //1 = High, 0 = Low
 
-    // Alarm from RTC
-    esp_sleep_enable_ext1_wakeup(0x8000000000, ESP_EXT1_WAKEUP_ALL_LOW); //1 = High, 0 = Low
-
     SD.end();
+
     display.powerOff();
+    esp_wifi_stop();
     esp_deep_sleep_start();
 //    esp_light_sleep_start();
 

@@ -13,8 +13,10 @@
 #include "edge-impulse-sdk/dsp/numpy.hpp"
 #include "inference_parameter.h"
 #include "edgeimpulse/ff_command_set_inference.h"
+#include <HTTPClient.h>
+#include <wifi_support.h>
 
-#undef DEBUG_PRINT
+#define DEBUG_PRINT
 
 /** Audio buffers, pointers and selectors */
 typedef struct {
@@ -31,6 +33,8 @@ extern inference_t inference;
 extern bool record_ready;
 extern signed short *sampleBuffer;
 extern bool debug_nn; // Set this to true to see e.g. features generated from the raw signal
+
+
 
 extern QueueHandle_t m_i2sQueue;
 
@@ -190,7 +194,7 @@ bool microphone_inference_start(uint32_t n_samples) {
 
     record_ready = true;
 
-    xTaskCreatePinnedToCore(CaptureSamples, "CaptureSamples", 1024 * 32, NULL, 1, &xHandle,0);
+    xTaskCreatePinnedToCore(CaptureSamples, "CaptureSamples", 1024 * 32, NULL, 1, &xHandle, 0);
 
     return true;
 }
@@ -229,9 +233,8 @@ void microphone_inference_end(void) {
     free(inference.buffers[0]);
     free(inference.buffers[1]);
     free(sampleBuffer);
-    if( xHandle != nullptr )
-    {
-        vTaskDelete( xHandle );
+    if (xHandle != nullptr) {
+        vTaskDelete(xHandle);
     }
 }
 
@@ -256,7 +259,7 @@ int microphone_audio_signal_get_data(size_t offset, size_t length, float *out_pt
 
 void InitVoiceCommands() {
     if (!b_voice_init) {
-        b_voice_init=true;
+        b_voice_init = true;
         DPF("Starting Inversion Mode - running on core: %i\n", xPortGetCoreID());
         run_classifier_init();
         if (microphone_inference_start(EI_CLASSIFIER_SLICE_SIZE) == false) {
@@ -267,11 +270,30 @@ void InitVoiceCommands() {
 
 void FinishVoiceCommands() {
     if (b_voice_init) {
-        b_voice_init=false;
+        b_voice_init = false;
         microphone_inference_end();
     }
 }
 
+void VoiceAcquisitionTEST() {
+
+    DPL("Start Voice Capture");
+
+    while (true) {
+        bool m = false;
+        while (!m) {
+            m = microphone_inference_record();
+            // todo uncomment error message
+            //          DPL("ERROR: Start Inference - microphone_inference_record");
+            // ei_printf("ERR: Failed to record audio...\n");
+            delay(1);
+            DP(".");
+        }
+        DP("+");
+        sendData((uint8_t *) &inference.buffers[inference.buf_select ^ 1][0], EI_CLASSIFIER_SLICE_SIZE * 2);
+        DP("-");
+    }
+}
 
 
 int GetVoiceCommand() {
@@ -283,12 +305,12 @@ int GetVoiceCommand() {
 
     while (true) {
 
-        bool m=false;
+        bool m = false;
 
         while (!m) {
             m = microphone_inference_record();
             // todo uncomment error message
-  //          DPL("ERROR: Start Inference - microphone_inference_record");
+            //          DPL("ERROR: Start Inference - microphone_inference_record");
             // ei_printf("ERR: Failed to record audio...\n");
             delay(1);
         }
@@ -307,7 +329,7 @@ int GetVoiceCommand() {
         if (++print_results >= (0)) {
 //print the predictions
 //       ei_printf("Predictions "); ei_printf("(DSP: %d ms., Classification: %d ms., Anomaly: %d ms.)", result.timing.dsp, result.timing.classification, result.timing.anomaly);
-//           ei_printf(": \n");
+            //          ei_printf(": \n");
             bool b_found_result = false;
             int max_value_idx = -1;
             float max_value = 0;
@@ -315,7 +337,7 @@ int GetVoiceCommand() {
             // Find the best value, and note if more then 85%
             for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
                 if ((result.classification[ix].value > 0.85) && (result.classification[ix].label[0] != 'N')) {
-//                ei_printf("\nResults:\n");
+                    ei_printf("\nResults:\n");
                     b_found_result = true;
                     if (result.classification[ix].value > max_value) {
                         max_value = result.classification[ix].value;
@@ -333,7 +355,7 @@ int GetVoiceCommand() {
                     if (max_value_idx == ix) ei_printf("<-----\n"); else ei_printf("\n");
                 }
                 ei_printf("\n");
-            } //else { ei_printf("."); }
+            } else { ei_printf("."); }
 #endif
             if (b_found_result) {
                 result_state = STATE_FOUND;
@@ -369,7 +391,7 @@ int GetVoiceCommand() {
                     }
                 }
                 DP("\n------------> ");
-                DPF("Result: %i - %f\n",final_value_idx,final_value);
+                DPF("Result: %i - %f\n", final_value_idx, final_value);
                 return final_value_idx;
 
             }

@@ -10,9 +10,12 @@
 #include "support.h"
 #include "custom_fonts/FreeSansNumOnly70.h"
 #include "rtc_support.h"
+#include "paint_alarm.h"
 #include <Fonts/FreeSans24pt7b.h>
 #include <Fonts/FreeSans18pt7b.h>
-#include <RTClib.h>
+#include <Fonts/FreeSans12pt7b.h>
+#include <my_RTClib.h>
+#include <paint_support.h>
 
 
 //
@@ -335,7 +338,7 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
     uint16_t x1 = ((tbw - sbw) / 2);
     uint16_t y1 = ((tbh - sbh) / 2) + sbh;
 
-    DP("tbw:");
+/*    DP("tbw:");
     DP(tbw);
     DP(" tbh:");
     DPL(tbh);
@@ -350,7 +353,7 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
     DP("x1:");
     DP(x1);
     DP(" y1:");
-    DPL(y1);
+    DPL(y1);*/
 
 
     display.firstPage();
@@ -391,10 +394,10 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
     DP("****** Entering Paint Watch Function - Timebase:");
     DPL(now.toString(str_format));
 
-/*    int min =min_sim;
-    min_sim=min_sim+5;
-    if (min_sim>60) min_sim=0;
-    DP("****** MIN SIM:");DPL(min_sim);*/
+//    int min =min_sim;
+//    min_sim=min_sim+5;
+//    if (min_sim>60) min_sim=0;
+//    DP("****** MIN SIM:");DPL(min_sim);*/
 
     int min = now.minute();
     if (now.second() && min<59) min=min+1; //if wakeup is at 04:59 - make sure we enable the next segment
@@ -450,7 +453,8 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
             display.fillScreen(GxEPD_WHITE);
             PaintFullWatchMin(display, &pwin, min);
 
-            //Paint Time
+/*          Paint Time*/
+
             int16_t tbx, tby;
             uint16_t tbw, tbh;
 
@@ -464,6 +468,31 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
             display.setCursor(x, y);
             display.print(str_hour);
 
+/*          Paint Alarm */
+
+            DateTime rtc_alarm={};
+            DateTime cur_time=rtc_watch.now();
+
+            if (rtc_watch.getAlarm2(&rtc_alarm, cur_time)) {;
+                char str_format1[]="hh:mm DD.MM.YYYY";
+                String str_alarm = rtc_alarm.toString(str_format1);
+                DP("****** Alarm from Watch is set-up:");
+                DPL(str_alarm);
+                
+                int hours=(rtc_alarm-cur_time).hours();
+                if (hours<24) {
+                     char str_format2[]="hh:mm";
+                    str_alarm = rtc_alarm.toString(str_format2);
+                    str_alarm = String(str_alarm+" ("+String(hours)+"h)");
+                    display.setTextColor(GxEPD_BLACK);
+                    display.setFont(&FreeSans12pt7b);
+                    PL(display, 10*PT12_HEIGHT, 0,str_alarm , false, true);
+                } else { DPL("Alarm more than 24 hours away");}
+                
+                
+            } else {
+                DPL("No alarm active");
+            }
 
 
         }

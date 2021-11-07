@@ -4,10 +4,17 @@
 
 #ifndef GOODWATCH_RTC_SUPPORT_H
 #define GOODWATCH_RTC_SUPPORT_H
-#include <RTClib.h>
+#include <my_RTClib.h>
 #include <global_display.h>
 #include <support.h>
 #include <EepromAT24C32.h>
+
+#include "esp_system.h"
+#include "nvs_flash.h"
+#include "nvs.h"
+
+#define ALARM1_5_MIN 1
+#define ALARM2_ALARM 2
 
 String DateTimeString(DateTime dt);
 void rtcPrintTimeNow() ;
@@ -25,6 +32,7 @@ struct strct_alarm {
 
 struct d_str {
     uint32_t crc32 = 0;   // 4 bytes
+    uint32_t dummy=4;
     struct strct_alarm alarms[ALARM_NUMBERS_DISPLAY];
 };
 
@@ -72,9 +80,63 @@ public:
         }
         DPL("*************");
     }
+#define STORAGE_NAMESPACE "storage"
+void writeRTCData() {
+        DPF("Write RTC-Data - Incoming buffer[%lu bytes]:\n", sizeof(d));
+        PrintAlarms();
+
+        d.crc32 = calculateCRC32(((uint8_t *) &d) + 4, sizeof(d) - 4);
+  /*      DP("RTC-Calc: ");
+        DPL(d.crc32);*/
+
+        nvs_handle my_handle;
+        esp_err_t err;
+        err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+        size_t required_size = sizeof(d);
+        if (err != ESP_OK) DPL("NVS_OPEN ERROR");
+        err = nvs_set_blob(my_handle, STORAGE_NAMESPACE, (uint8_t *) &d, required_size);
+        if (err != ESP_OK) DPL("NVS_WRITE ERROR");
+        // Commit
+        err = nvs_commit(my_handle);
+        if (err != ESP_OK) DPL("NVS Commit Error");
+
+    }
 
     void getRTCData() {
         DPL("getRTCData");
+
+        nvs_handle my_handle;
+        esp_err_t err;
+        err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+        if (err != ESP_OK) DPL("NVS_OPEN ERROR");
+        size_t required_size = sizeof(d);
+        err = nvs_get_blob(my_handle, STORAGE_NAMESPACE, (uint8_t *) this, &required_size);
+        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+            DPL("NVS READ ERROR");
+        }
+        // Calculate the CRC of what we just read from RTC memory, but skip the first 4 bytes as that's the checksum itself.
+        uint32_t crc = calculateCRC32(((uint8_t *) &d) + 4, sizeof(d) - 4);
+//        DPF("Calc CR32: %i\n", crc);
+//        DPF("Saved CR32: %i\n", d.crc32);
+        if (crc == d.crc32) {
+            DPL("Valid RTC");
+        } else {
+            DPL("**** InValid RTC - Reinit Alarms ***");
+            for (int i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
+                d.alarms[i].active = false;
+                d.alarms[i].valid = false;
+            }
+            writeRTCData();
+        }
+
+        PrintAlarms();
+    }
+
+
+    // Some versions of the DSP3231 have EEPROM chip At24c32 on board use-able as permanent memory
+    void At24c32_getRTCData() {
+        DPL("getRTCData");
+
         EepromAt24c32<TwoWire> RtcEeprom(Wire);
         RtcEeprom.Begin();
 
@@ -91,13 +153,13 @@ public:
                 d.alarms[i].active = false;
                 d.alarms[i].valid = false;
             }
-            writeRTCData();
+            At24c32_writeRTCData();
         }
 
         PrintAlarms();
     }
 
-    void writeRTCData() {
+    void At24c32_writeRTCData() {
         EepromAt24c32<TwoWire> RtcEeprom(Wire);
         DPF("Write RTC-Data - Incoming buffer[%lu bytes]:\n", sizeof(d));
         PrintAlarms();
@@ -109,6 +171,7 @@ public:
         RtcEeprom.GetMemory(0, (uint8_t *) &d, sizeof(d));
         DPF("RTC CR32: %i\n", d.crc32);
     }
+
 
 private:
 
@@ -140,6 +203,7 @@ class rtc_support {
 
 
 };
+
 
 
 #endif //GOODWATCH_RTC_SUPPORT_H

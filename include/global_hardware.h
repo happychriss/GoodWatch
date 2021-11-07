@@ -16,9 +16,11 @@
 // Distance Measurement APDS9960 via *I2C* and GPIO 21=SDA and 22=SCL
 #define PIR_INT   34  // Needs to be an interrupt pin
 
+#define RTC_INT 39 // VN Pin
+
 // Display Light
 #define DISPLAY_CONTROL 27 //dims the light
-#define DISPLAY_AND_SOUND_POWER 13// enables the  MT3608 (power for display and the MAX98735A (I2S Sound, SD to ground)
+#define                           DISPLAY_AND_SOUND_POWER 13// enables the  MT3608 (power for display and the MAX98735A (I2S Sound, SD to ground)
 
 //SD Card (Pins are not used, set as default) using SPI together with EPD
 #define SD_CS          4

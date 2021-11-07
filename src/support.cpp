@@ -5,7 +5,7 @@
 #include "Arduino.h"
 #include "support.h"
 #include "freertos/FreeRTOS.h"
-#include <RTClib.h>
+#include <my_RTClib.h>
 #include <sys/time.h>
 
 extern RTC_DS1307 rtc_watch;

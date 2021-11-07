@@ -17,8 +17,8 @@ extern SparkFun_APDS9960 apds;
 
 void apds_init_proximity() {
     apds.init();
-    apds.resetGestureParameters(); // changed sparkfun, set as non private, to be fixed todo
-    apds.wireWriteDataByte(APDS9960_WTIME, 0xa6);
+   apds.resetGestureParameters(); // changed sparkfun, set as non private, to be fixed todo
+   apds.wireWriteDataByte(APDS9960_WTIME, 0xa6);
     apds.wireWriteDataByte(APDS9960_PPULSE, DEFAULT_PROX_PPULSE);
     apds.setLEDBoost(LED_BOOST_100);
     apds.setProximityIntEnable(true);
