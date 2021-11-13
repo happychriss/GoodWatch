@@ -25,6 +25,7 @@ void rtsSetEspTime(DateTime dt);
 String rtcFormatCurrentTime(char * str_format);
 
 struct strct_alarm {
+    uint8_t i =0;
     bool active = {false};
     bool valid = {false};
     DateTime time;
@@ -32,7 +33,6 @@ struct strct_alarm {
 
 struct d_str {
     uint32_t crc32 = 0;   // 4 bytes
-    uint32_t dummy=4;
     struct strct_alarm alarms[ALARM_NUMBERS_DISPLAY];
 };
 
@@ -120,11 +120,15 @@ void writeRTCData() {
 //        DPF("Saved CR32: %i\n", d.crc32);
         if (crc == d.crc32) {
             DPL("Valid RTC");
+            for (int i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
+                d.alarms[i].i = i;
+            }
         } else {
             DPL("**** InValid RTC - Reinit Alarms ***");
             for (int i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
                 d.alarms[i].active = false;
                 d.alarms[i].valid = false;
+                d.alarms[i].i = i;
             }
             writeRTCData();
         }

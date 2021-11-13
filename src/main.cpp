@@ -1,4 +1,5 @@
 #define ENABLE_GxEPD2_GFX 1
+#define ARDUHAL_LOG_LEVEL 5
 #include <Arduino.h>
 #include "WiFi.h"
 #include <time.h>
@@ -8,7 +9,8 @@
 #include "paint_alarm.h"
 #include <my_RTClib.h>
 #include <ArduinoOTA.h>
-
+#include <SPIFFS.h>
+#include "esp_spiffs.h"
 // various
 
 
@@ -31,6 +33,7 @@
 // #define DATA_ACQUISITION -> check in file support.h
 #undef DISABLE_EPD
 #define DATA_ACQUISITION
+
 
 //todo: SparkFun_APDS9960_H - moved some functions from private to public
 
@@ -55,7 +58,7 @@ QueueHandle_t m_i2sQueue;
 
 
 
-// Audio playing with SD Card
+// Audio playing
 bool b_audio_end_of_mp3 = false;
 Audio audio;
 
@@ -93,23 +96,21 @@ void setup() {
     digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
     digitalWrite(DISPLAY_CONTROL, LOW);
 
-    // https://github.com/espressif/esp-idf/blob/bcbef9a8db54d2deef83402f6e4403ccf298803a/examples/storage/nvs_rw_blob/main/nvs_blob_example_main.c
+
+    // Keep the alarm times https://github.com/espressif/esp-idf/blob/bcbef9a8db54d2deef83402f6e4403ccf298803a/examples/storage/nvs_rw_blob/main/nvs_blob_example_main.c
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        // NVS partition was truncated and needs to be erased
-        // Retry nvs_flash_init
+        // NVS partition was truncated and needs to be erased Retry nvs_flash_init
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK( err );
 
+    DPL("Setup: DONE");
+
 }
 
-/*void  PaintWatchTask(GxEPD2_GFX &display) {
-    PaintWatch(display, true);
-    vTaskDelete(NULL);
-}*/
-
+/* MAIN LOOP *********************************************************************************************/
 
 void loop() {
 
@@ -167,7 +168,6 @@ void loop() {
 
     }
 
-
 /*
     // **********************************************************************************************
     // Alarm Clock Wakeup ***************************************************************************
@@ -177,7 +177,7 @@ void loop() {
 
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
         DPL("!!!! RTC Alarm Clock Wakeup");
-
+        /* 5 min wakeup  ***************************************************************************/
         if (rtc_watch.alarmFired(ALARM1_5_MIN)) {
             DPL("*** Alarm2 Fired: Alarm for 5min refresh");
             DPL("!!! RTC Wakeup after 5min");
@@ -187,41 +187,27 @@ void loop() {
             PaintWatch(display, true, false);
         }
 
+        /* Alarm wakeup  ***************************************************************************/
         if (rtc_watch.alarmFired(ALARM2_ALARM)) {
             DPL("*** Alarm2 Fired: ALARM for Wakeup");
             rtc_watch.clearAlarm(ALARM2_ALARM);
             rtc_watch.disableAlarm(ALARM2_ALARM);
-            rtcData.getRTCData();
 
+            rtcData.getRTCData();
             DeactivateOneTimeAlarm();
-            SetNextAlarm(true);
             rtcData.writeRTCData();
+
+            SetNextAlarm(true);
 
             digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
             //        pinMode(GPIO_NUM_34, INPUT_PULLUP);
-            delay(1000);
-            attachInterrupt(GPIO_NUM_34, Ext_INT1_ISR, HIGH);
-            InitAudio();
-            //    SerialKeyWait();
-            audio.connecttoFS(SD, "/good_morning.mp3");
-            //     audio.connecttohost("http://mp3.ffh.de/radioffh/hqlivestream.aac");
+            delay(2500);
+            attachInterrupt(PIR_INT, Ext_INT1_ISR, HIGH);
 
-            DPL("Play the song!!!");
-            while (!b_audio_end_of_mp3) {
-                audio.loop();
-                if (b_pir_wave) {
-                    DPL("End of Song, PIR was raised");
-                    break;
-                }
-                if (Serial.available()) { // put streamURL in serial monitor
-                    audio.stopSong();
-                    String r = Serial.readString();
-                    r.trim();
-                    if (r.length() > 5) audio.connecttohost(r.c_str());
-                    log_i("free heap=%i", ESP.getFreeHeap());
-                }
-            }
-            detachInterrupt(GPIO_NUM_34);
+            // Play sound *********************
+            PlayWakeupSong();
+
+            detachInterrupt(PIR_INT);
             digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
             while (digitalRead(PIR_INT) == true) {
                 delay(100);
@@ -230,9 +216,6 @@ void loop() {
             PaintWatch(display, false, false);
 
         };
-
-
-
 
     }
 
@@ -336,8 +319,6 @@ void loop() {
 
     // Alarm from PIR
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_34, HIGH); //1 = High, 0 = Low
-
-    SD.end();
 
     display.powerOff();
     esp_wifi_stop();

@@ -13,7 +13,12 @@
 #include <rtc_support.h>
 #include <paint_support.h>
 #include <ArduinoOTA.h>
+#include "Audio.h"
+#include "audio_support.hpp"
+#include <FS.h>
+#include <SPIFFS.h>
 
+extern Audio audio;
 
 // days start Sunday
 struct str_watch_config wc[ALARM_NUMBERS_DISPLAY] = {
@@ -84,7 +89,7 @@ int DeactivateOneTimeAlarm() {
         if (rtcData.d.alarms[i].active && wc[i].type == single) {
             DPF("Checking [%i]: %s:", i, rtcData.str_short(i).c_str());
 
-            if ((rtcData.d.alarms[i].time - tmp_now).seconds() < 60) {
+            if ((tmp_now-rtcData.d.alarms[i].time).seconds() < 60) {
                 DPL("Found and deactivated");
                 index = i;
                 rtcData.d.alarms[i].active = false;
@@ -422,7 +427,8 @@ void ConfigGoodWatch(GxEPD2_GFX &d) {
         PL(d, MESSAGE_LINE, 1, "Welcome - GoodWatch", false, true);
         PL(d, 3*PT12_HEIGHT,1, "1: Record Sound", false, true);
         PL(d, 4*PT12_HEIGHT,1, "2: OTA Update", false, true);
-        PL(d, 6*PT12_HEIGHT,1, battery, false, true);
+        PL(d, 5*PT12_HEIGHT,1, "3: Play Music", false, true);
+        PL(d, 6*PT12_HEIGHT+PT12_BREAK,1, battery, false, true);
 
     } while (d.nextPage());
 
@@ -482,6 +488,19 @@ void ConfigGoodWatch(GxEPD2_GFX &d) {
             ArduinoOTA.handle();
             delay(1000);
         }
+    }
+
+    if (value_idx==3) {
+
+       digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
+
+       PlayWakeupSong();
+
+        digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
+        while (digitalRead(PIR_INT) == true) {
+            delay(100);
+        }
+
     }
 
 }

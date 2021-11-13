@@ -20,7 +20,7 @@
 
 // Display Light
 #define DISPLAY_CONTROL 27 //dims the light
-#define                           DISPLAY_AND_SOUND_POWER 13// enables the  MT3608 (power for display and the MAX98735A (I2S Sound, SD to ground)
+#define DISPLAY_AND_SOUND_POWER 13// enables the  MT3608 (power for display and the MAX98357A (I2S Sound, SD to ground)
 
 //SD Card (Pins are not used, set as default) using SPI together with EPD
 #define SD_CS          4

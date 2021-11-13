@@ -39,26 +39,25 @@ struct st_pwin {
 
 extern RTC_DS3231 rtc_watch;
 
-void printText(GxEPD2_GFX &my_display, char * text, uint line) {
+void printText(GxEPD2_GFX &my_display, char *text, uint line) {
 
     //Serial.println("helloWorld");
     my_display.setRotation(1);
     my_display.setFont(&FreeSans24pt7b);
     my_display.setTextColor(GxEPD_BLACK);
-    int16_t tbx, tby; uint16_t tbw, tbh;
+    int16_t tbx, tby;
+    uint16_t tbw, tbh;
     my_display.getTextBounds(text, 0, 0, &tbx, &tby, &tbw, &tbh);
     // center bounding box by transposition of origin:
     uint16_t x = ((my_display.width() - tbw) / 2) - tbx;
     uint16_t y = ((my_display.height() - tbh) / 2) - tby;
     my_display.setFullWindow();
     my_display.firstPage();
-    do
-    {
+    do {
         my_display.fillScreen(GxEPD_WHITE);
         my_display.setCursor(x, y);
         my_display.print(text);
-    }
-    while (my_display.nextPage());
+    } while (my_display.nextPage());
     //Serial.println("helloWorld done");
 }
 
@@ -322,8 +321,8 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
     display.init(0, false);
 
     DateTime now = rtc_watch.now();
-    char str_format[]="hh:mm:ss";
-    String str_time_now= now.toString(str_format);
+    char str_format[] = "hh:mm:ss";
+    String str_time_now = now.toString(str_format);
 
     display.setFont(&FreeSans70pt7b);
     display.getTextBounds("88", 0, 0, &tbx, &tby, &tbw, &tbh);
@@ -372,8 +371,9 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
         int16_t tbx, tby;
         uint16_t tbw, tbh;
 
-        String str_hour=String(now.hour());
-        DP("Print Hour:");DPL(str_hour);
+        String str_hour = String(now.hour());
+        DP("Print Hour:");
+        DPL(str_hour);
 
         display.setTextColor(GxEPD_BLACK);
         display.setFont(&FreeSans70pt7b);
@@ -382,15 +382,51 @@ void PaintQuickTime(GxEPD2_GFX &display, boolean b_clear) {
         uint16_t y = (display.height() * 2 / 4) + tbh / 2; // y is base line!
         display.setCursor(x, y);
         display.print(str_hour);
+
+
     } while (display.nextPage());
 }
 
+String GetAlarmInfo(GxEPD2_GFX &display, DateTime cur_time, bool b_minutes) {
+    DateTime rtc_alarm = {};
+    String str_alarm = "";
+
+    if (rtc_watch.getAlarm2(&rtc_alarm, cur_time)) { ;
+
+        TimeSpan wakeup = rtc_alarm - cur_time;
+        int hours = wakeup.hours();
+
+        String str_countdown = "";
+        char str_format2[] = "hh:mm";
+
+        // On refresh mode (every 5min) , when less than one hour, update minutes
+        if (wakeup.days() == 0 && wakeup.hours() == 0 && wakeup.minutes() > 0 && b_minutes) {
+            str_countdown = String(" (" + String(wakeup.minutes()) + "m)");
+        }
+
+        // Normal mode, show hours
+        if (wakeup.hours() < 24 && wakeup.days() == 0 && !b_minutes) {
+            str_countdown = String(" (" + String(hours) + "h)");
+        }
+
+        if (str_countdown != "") {
+            str_alarm = rtc_alarm.toString(str_format2);
+            str_alarm = String(str_alarm + str_countdown);
+        } else { DPL("Alarm more than 24 hours away"); }
+
+
+    } else {
+        DPL("No alarm active");
+    }
+
+    return str_alarm;
+}
 
 void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm_time) {
 
     DateTime now = rtc_watch.now();
 
-    char str_format[]="hh:mm:ss - DDD, DD.MM.YYYY";
+    char str_format[] = "hh:mm:ss - DDD, DD.MM.YYYY";
     DP("****** Entering Paint Watch Function - Timebase:");
     DPL(now.toString(str_format));
 
@@ -400,7 +436,7 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
 //    DP("****** MIN SIM:");DPL(min_sim);*/
 
     int min = now.minute();
-    if (now.second() && min<59) min=min+1; //if wakeup is at 04:59 - make sure we enable the next segment
+    if (now.second() && min < 59) min = min + 1; //if wakeup is at 04:59 - make sure we enable the next segment
 
     display.init(0, false);
     st_pwin pwin{};
@@ -432,23 +468,44 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
         display.setFont(&FreeSans70pt7b);
     }
 
-    // *************** Paint the watch in EPD loop *************************************
 
-    display.firstPage();
-    do {
+    /* // *************** Paint the partial watch, every 5 min**************************************/
 
-        if (b_refresh_only) {
-            DPL("***** Partial Refresh of Display ***");
+    if (b_refresh_only) {
+        DPL("***** Partial Refresh of Display ***");
 
+        display.firstPage();
+        do {
             pwin.simulate = true;
             PaintPartialWatchMin(display, &pwin, min);
             display.setPartialWindow(pwin.x0, pwin.y0, pwin.x1 - pwin.x0, pwin.y1 - pwin.y0);
             pwin.simulate = false;
             PaintPartialWatchMin(display, &pwin, min);
 
+        } while (display.nextPage());
 
-        } else {
-            DPL("***** Full Refresh of Display ***");
+        DateTime rtc_alarm = {};
+        if (rtc_watch.getAlarm2(&rtc_alarm, now)) { ;
+            TimeSpan wakeup = rtc_alarm - now;
+            // On refresh mode (every 5min) , when less than one hour, update minutes
+            if (wakeup.days() == 0 && wakeup.hours() == 0 && wakeup.minutes() > 0) {
+                display.firstPage();
+                do {
+                    char str_format2[] = "hh:mm";
+                    String str_alarm = rtc_alarm.toString(str_format2) + String(" (" + String(wakeup.minutes() + 1) + "m)");;
+                    display.setTextColor(GxEPD_BLACK);
+                    display.setFont(&FreeSans12pt7b);
+                    PL(display, 10 * PT12_HEIGHT, 0, str_alarm, true, false);
+                } while (display.nextPage());
+            }
+        }
+
+        /* // *************** Paint the full watch very hour **************************************/
+    } else {
+        DPL("***** Full Refresh of Display ***");
+
+        display.firstPage();
+        do {
             pwin.simulate = false;
             display.fillScreen(GxEPD_WHITE);
             PaintFullWatchMin(display, &pwin, min);
@@ -458,8 +515,9 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
             int16_t tbx, tby;
             uint16_t tbw, tbh;
 
-            String str_hour=String(now.hour());
-            DP("Print Hour:");DPL(str_hour);
+            String str_hour = String(now.hour());
+            DP("Print Hour:");
+            DPL(str_hour);
             display.setTextColor(GxEPD_BLACK);
             display.setFont(&FreeSans70pt7b);
             display.getTextBounds(str_hour, 0, 0, &tbx, &tby, &tbw, &tbh);
@@ -469,35 +527,20 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
             display.print(str_hour);
 
 /*          Paint Alarm */
-
-            DateTime rtc_alarm={};
-            DateTime cur_time=rtc_watch.now();
-
-            if (rtc_watch.getAlarm2(&rtc_alarm, cur_time)) {;
-                char str_format1[]="hh:mm DD.MM.YYYY";
-                String str_alarm = rtc_alarm.toString(str_format1);
-                DP("****** Alarm from Watch is set-up:");
-                DPL(str_alarm);
-                
-                int hours=(rtc_alarm-cur_time).hours();
-                if (hours<24) {
-                     char str_format2[]="hh:mm";
-                    str_alarm = rtc_alarm.toString(str_format2);
-                    str_alarm = String(str_alarm+" ("+String(hours)+"h)");
+            DateTime rtc_alarm = {};
+            if (rtc_watch.getAlarm2(&rtc_alarm, now)) { ;
+                TimeSpan wakeup = rtc_alarm - now;
+                // Normal mode, show hours
+                if (wakeup.hours() < 24 && wakeup.days() == 0) {
+                    char str_format2[] = "hh:mm";
+                    String str_alarm = rtc_alarm.toString(str_format2) + String(" (" + String(wakeup.hours()) + "h)");;
                     display.setTextColor(GxEPD_BLACK);
                     display.setFont(&FreeSans12pt7b);
-                    PL(display, 10*PT12_HEIGHT, 0,str_alarm , false, true);
-                } else { DPL("Alarm more than 24 hours away");}
-                
-                
-            } else {
-                DPL("No alarm active");
+                    PL(display, 10 * PT12_HEIGHT, 0, str_alarm, false, false);
+                }
             }
+        } while (display.nextPage());
+    }
 
-
-        }
-
-
-    } while (display.nextPage());
 }
 
