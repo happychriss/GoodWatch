@@ -194,7 +194,7 @@ void loop() {
             rtc_watch.disableAlarm(ALARM2_ALARM);
 
             rtcData.getRTCData();
-            DeactivateOneTimeAlarm();
+            UpdateRTCWithNextAlarms();
             rtcData.writeRTCData();
 
             SetNextAlarm(true);
@@ -203,7 +203,6 @@ void loop() {
             //        pinMode(GPIO_NUM_34, INPUT_PULLUP);
             delay(2500);
             attachInterrupt(PIR_INT, Ext_INT1_ISR, HIGH);
-
             // Play sound *********************
             PlayWakeupSong();
 
@@ -235,16 +234,20 @@ void loop() {
         uint8_t proximity_data = 0;
         uint16_t ambient_light = 0;
         delay(120);
-
-            for (int i = 0; i < 7; i++) {
+#define HAND_WAIT 70
+            long avg_proximity_data=0;
+            for (int i = 0; i < HAND_WAIT; i++) {
                 // Read the proximity value
                 apds.readProximity(proximity_data);
                 apds.readAmbientLight(ambient_light);
+                avg_proximity_data=avg_proximity_data+proximity_data;
 //              DP(i); DP("-"); DP(proximity_data); DP("-"); DPL(ambient_light);
                 // Read the light levels (ambient, red, green, blue)
             }
+            avg_proximity_data=avg_proximity_data/HAND_WAIT;
 
         DPF("Proximity: %i\n",proximity_data);
+        DPF("Avg-Proximity: %li\n",avg_proximity_data);
 
         if (ambient_light == 0) {
             digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
@@ -255,12 +258,12 @@ void loop() {
         // VERY CLOSE - Data Acuisition and OTA Update **************************************************
         // ***********************************************************************************************/
 
-        if (proximity_data > 200) { //hand is very close
+        if (avg_proximity_data > 200) { //hand is very close
             DPL("Proximity-Check: Very close");
             SetupWifi_SNTP();
             ConfigGoodWatch(display);
             PaintWatch(display, false, false);
-        } else if (proximity_data > 45) { //hand a bit away
+        } else if (avg_proximity_data > 100) { //hand a bit away
 
 /*            // **********************************************************************************************
             // Medium Close - Show Alarm Screen ********** **************************************************

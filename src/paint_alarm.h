@@ -13,7 +13,7 @@
 
 
 void ProgramAlarm(GxEPD2_GFX &d );
-int DeactivateOneTimeAlarm();
+void UpdateRTCWithNextAlarms();
 int SetNextAlarm(bool b_write_to_rtc);
 void ConfigGoodWatch(GxEPD2_GFX &d);
 

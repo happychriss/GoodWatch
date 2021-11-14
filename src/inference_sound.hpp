@@ -15,6 +15,7 @@
 #include "edgeimpulse/ff_command_set_inference.h"
 #include <HTTPClient.h>
 #include <wifi_support.h>
+#include <global_display.h>
 
 #define DEBUG_PRINT
 
@@ -302,6 +303,8 @@ int GetVoiceCommand() {
     int print_results = 0;
     short result_state = STATE_NOTHING;
     float values[EI_CLASSIFIER_LABEL_COUNT] = {0.0};
+#define TIMEOUT 70
+    int timeout_count=0;
 
     while (true) {
 
@@ -355,15 +358,25 @@ int GetVoiceCommand() {
                     if (max_value_idx == ix) ei_printf("<-----\n"); else ei_printf("\n");
                 }
                 ei_printf("\n");
-            } else { ei_printf("."); }
+            } else {
+                ei_printf(".");
+            }
 #endif
+
             if (b_found_result) {
                 result_state = STATE_FOUND;
                 values[max_value_idx] = values[max_value_idx] + max_value;
+                timeout_count=0;
             } else {
+                if (timeout_count>TIMEOUT) {
+                    DPL("Inference Timeout - return NO");
+                    return ANSWER_NO;
+                }
+
                 switch (result_state) {
                     case STATE_NOTHING:
                         result_state = STATE_NOTHING;
+                        timeout_count++;
                         break;
                     case STATE_FOUND:
                         result_state = STATE_FOUND_MISSED_ONE;

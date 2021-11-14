@@ -1,9 +1,6 @@
 #include "Arduino.h"
 #include "Audio.h"
-
-extern bool b_audio_end_of_mp3;
-extern bool b_pir_wave;
-extern Audio audio;
+#include "audio_support.h"
 
 
 void audio_info(const char *info) {
@@ -22,6 +19,7 @@ void fade_in(void *parameter) {
         audio.setVolume(i);
         vTaskDelay(pdMS_TO_TICKS(1000));
         DPF("INT volume: %i\n", i);
+        if (b_pir_wave) break;
     }
     vTaskDelete(NULL);
 }
@@ -58,6 +56,8 @@ void PlayWakeupSong() {
 
         if (b_pir_wave) {
             DPL("End of Song, PIR was raised");
+            audio.setVolume(0); // 0...21
+            delay(200);
             b_pir_wave = false;
             break;
         }

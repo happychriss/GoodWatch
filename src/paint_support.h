@@ -13,10 +13,6 @@
 #include "my_RTClib.h"
 
 
-#define ANSWER_YES 10
-#define ANSWER_NO 11
-#define ANSWER_SET 9
-
 //  { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "j", "n" };
 
 void HoursUntilAlarm(DateTime alarm, char * timeuntil);
