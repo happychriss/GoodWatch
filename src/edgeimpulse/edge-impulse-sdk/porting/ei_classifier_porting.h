@@ -47,7 +47,8 @@ typedef enum {
     EI_IMPULSE_INPUT_TENSOR_WAS_NULL = -13,
     EI_IMPULSE_OUTPUT_TENSOR_WAS_NULL = -14,
     EI_IMPULSE_SCORE_TENSOR_WAS_NULL = -15,
-    EI_IMPULSE_LABEL_TENSOR_WAS_NULL = -16
+    EI_IMPULSE_LABEL_TENSOR_WAS_NULL = -16,
+    EI_IMPULSE_TENSORRT_INIT_FAILED = -17
 } EI_IMPULSE_ERROR;
 
 /**
@@ -87,6 +88,7 @@ void ei_putchar(char c);
  * Print wrapper around printf()
  * This is used internally to print debug information.
  */
+__attribute__ ((format (printf, 1, 2)))
 void ei_printf(const char *format, ...);
 
 /**

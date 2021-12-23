@@ -203,6 +203,10 @@ public:
             high_frequency = sampling_frequency / 2;
         }
 
+        if (low_frequency == 0) {
+            low_frequency = 300;
+        }
+
         stack_frames_info_t stack_frame_info = { 0 };
         stack_frame_info.signal = signal;
 
@@ -294,7 +298,7 @@ public:
 
             float energy = numpy::sum(power_spectrum_frame.buffer, power_spectrum_frame_size);
             if (energy == 0) {
-                energy = FLT_EPSILON;
+                energy = 1e-10;
             }
 
             out_energies->buffer[ix] = energy;
@@ -387,6 +391,25 @@ public:
             );
             if (ret != 0) {
                 EIDSP_ERR(ret);
+            }
+
+            // normalize data (only when version is above 3)
+            if (version >= 3) {
+                // it might be that everything is already normalized here...
+                bool all_between_min_1_and_1 = true;
+                for (size_t ix = 0; ix < signal_frame.rows * signal_frame.cols; ix++) {
+                    if (signal_frame.buffer[ix] < -1.0f || signal_frame.buffer[ix] > 1.0f) {
+                        all_between_min_1_and_1 = false;
+                        break;
+                    }
+                }
+
+                if (!all_between_min_1_and_1) {
+                    ret = numpy::scale(&signal_frame, 1.0f / 32768.0f);
+                    if (ret != 0) {
+                        EIDSP_ERR(ret);
+                    }
+                }
             }
 
             ret = processing::power_spectrum(

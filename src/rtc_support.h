@@ -7,7 +7,7 @@
 #include <my_RTClib.h>
 #include <global_display.h>
 #include <support.h>
-#include <EepromAT24C32.h>
+
 
 #include "esp_system.h"
 #include "nvs_flash.h"
@@ -136,45 +136,6 @@ void writeRTCData() {
         PrintAlarms();
     }
 
-
-    // Some versions of the DSP3231 have EEPROM chip At24c32 on board use-able as permanent memory
-    void At24c32_getRTCData() {
-        DPL("getRTCData");
-
-        EepromAt24c32<TwoWire> RtcEeprom(Wire);
-        RtcEeprom.Begin();
-
-        RtcEeprom.GetMemory(0, (uint8_t *) this, sizeof(d));
-        // Calculate the CRC of what we just read from RTC memory, but skip the first 4 bytes as that's the checksum itself.
-        uint32_t crc = calculateCRC32(((uint8_t *) &d) + 4, sizeof(d) - 4);
-        DPF("Calc CR32: %i\n", crc);
-        DPF("Saved CR32: %i\n", d.crc32);
-        if (crc == d.crc32) {
-            DPL("Valid RTC");
-        } else {
-            DPL("**** InValid RTC - Reinit Alarms ***");
-            for (int i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
-                d.alarms[i].active = false;
-                d.alarms[i].valid = false;
-            }
-            At24c32_writeRTCData();
-        }
-
-        PrintAlarms();
-    }
-
-    void At24c32_writeRTCData() {
-        EepromAt24c32<TwoWire> RtcEeprom(Wire);
-        DPF("Write RTC-Data - Incoming buffer[%lu bytes]:\n", sizeof(d));
-        PrintAlarms();
-        d.crc32 = calculateCRC32(((uint8_t *) &d) + 4, sizeof(d) - 4);
-        DP("RTC-Calc: ");
-        DPL(d.crc32);
-        RtcEeprom.WriteMemoryBuffer((uint8_t *) &d, sizeof(d));
-        DPL("******** Read Buffer ********");
-        RtcEeprom.GetMemory(0, (uint8_t *) &d, sizeof(d));
-        DPF("RTC CR32: %i\n", d.crc32);
-    }
 
 
 private:

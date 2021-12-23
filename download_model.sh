@@ -1,5 +1,6 @@
 #!/bin/bash
-project_id='22616'
+project_id='43692'
+project_name='ff_command_set_final'
 set -e
 echo "Start Download..."
 curl --request GET \
@@ -8,8 +9,9 @@ curl --request GET \
   --header 'x-api-key: '''${1}''\
   --output arduino_model.zip
 unzip -q arduino_model.zip -d ./src/edgeimpulse_tmp
-rm -r ./src/edgeimpulse/*
-mv ./src/edgeimpulse_tmp/src/* ./src/edgeimpulse/
+rm -r ./src/edgeimpulse/
+mkdir ./src/edgeimpulse
+mv ./src/edgeimpulse_tmp/ff_command_set_final_inferencing/src/* ./src/edgeimpulse
 rm -r ./src/edgeimpulse_tmp/
 rm ./arduino_model.zip
 find ./src/edgeimpulse -type f -exec touch {} +

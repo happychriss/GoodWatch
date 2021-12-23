@@ -4,7 +4,7 @@
 
 #include "paint_alarm.h"
 #include <Fonts/FreeSans12pt7b.h>
-#include "edgeimpulse/ff_command_set_inference.h"
+#include "edgeimpulse/ff_command_set_final_inferencing.h"
 #include "inference_sound.hpp"
 #include "driver/i2s.h"
 #include <my_RTClib.h>

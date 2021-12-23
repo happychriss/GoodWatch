@@ -12,7 +12,7 @@
 #include "freertos/task.h"
 #include "edge-impulse-sdk/dsp/numpy.hpp"
 #include "inference_parameter.h"
-#include "edgeimpulse/ff_command_set_inference.h"
+#include "edgeimpulse/ff_command_set_final_inferencing.h"
 #include <HTTPClient.h>
 #include <wifi_support.h>
 #include <global_display.h>
@@ -72,6 +72,7 @@ void i2s_init(void) {
             .data_out_num = I2S_PIN_NO_CHANGE, // this is DATA output pin
             .data_in_num = I2S_NUM_2_DIN   //DATA IN
     };
+
 
     // https://github.com/atomic14/ICS-43434-breakout-board
     i2s_config_t i2s_config_micro = {

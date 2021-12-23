@@ -12,7 +12,7 @@
 #include <global_display.h>
 
 extern RTC_DS3231 rtc_watch;
-EepromAt24c32<TwoWire> RtcEeprom(Wire);
+
 String DateTimeString(DateTime dt) {
     char str_format[]="hh:mm:ss - DDD, DD.MM.YYYY";
     String str_time_now=dt.toString(str_format);

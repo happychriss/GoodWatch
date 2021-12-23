@@ -33,6 +33,26 @@ void SetupWifi_SNTP() {
         ESP.restart();
     }
     delay(500);
+
+    DPL("Wifi Details:");
+    DP("Wifi DNS: ");
+    DPL(WiFi.dnsIP());
+    DP("Wifi IP:");
+    DPL(WiFi.localIP());
+
+/*
+    char ntpServerName[] = "mp3.ffh.de";
+    IPAddress ntpServerIP;
+    WiFi.hostByName(ntpServerName, ntpServerIP);
+    DP("WDR IP:");
+    DPL(ntpServerIP);
+
+    uint32_t t = millis();
+    WiFiClient        client;
+    if(client.connect(ntpServerName, 80, 1000)) {
+        uint32_t dt = millis() - t;
+        DPF("Connected in: %i\n", dt);
+    }*/
     DPL("DONE");
 
     DP("SNT Server Setup:");

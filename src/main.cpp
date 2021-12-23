@@ -107,14 +107,18 @@ void setup() {
     ESP_ERROR_CHECK( err );
 
     DPL("Setup: DONE");
-
+    if (false) {
+        //        pinMode(GPIO_NUM_34, INPUT_PULLUP);
+        delay(2500);
+        PlayWakeupSong();
+    }
 }
 
 /* MAIN LOOP *********************************************************************************************/
 
 void loop() {
-
     DPL("****** Main Loop ***********");
+
     wakeup_reason = print_wakeup_reason();
 
     // initializing the rtc
@@ -155,6 +159,9 @@ void loop() {
         rtcSetRTCFromInternet();
         DPF("RTC Init with Temperature: %f\n",rtc_watch.getTemperature()); // in Celsius degree
         PaintWatch(display, false, false);
+
+
+
     } else {
         // Check RTC  Clock ****************************************************************
         DPL("!!!! ****** Wakeup ****** !!!!");
@@ -258,12 +265,12 @@ void loop() {
         // VERY CLOSE - Data Acuisition and OTA Update **************************************************
         // ***********************************************************************************************/
 
-        if (avg_proximity_data > 200) { //hand is very close
+        if (avg_proximity_data > 220) { //hand is very close
             DPL("Proximity-Check: Very close");
             SetupWifi_SNTP();
             ConfigGoodWatch(display);
             PaintWatch(display, false, false);
-        } else if (avg_proximity_data > 100) { //hand a bit away
+        } else if (avg_proximity_data > 15) { //hand a bit away
 
 /*            // **********************************************************************************************
             // Medium Close - Show Alarm Screen ********** **************************************************
