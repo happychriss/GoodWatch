@@ -201,25 +201,30 @@ void loop() {
             rtc_watch.disableAlarm(ALARM2_ALARM);
 
             rtcData.getRTCData();
-            UpdateRTCWithNextAlarms();
-            rtcData.writeRTCData();
 
-            SetNextAlarm(true);
+            if(UpdateRTCWithNextAlarms()) {
+                rtcData.writeRTCData();
 
-            digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
-            //        pinMode(GPIO_NUM_34, INPUT_PULLUP);
-            delay(2500);
-            attachInterrupt(PIR_INT, Ext_INT1_ISR, HIGH);
-            // Play sound *********************
-            PlayWakeupSong();
+                SetNextAlarm(true);
 
-            detachInterrupt(PIR_INT);
-            digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
-            while (digitalRead(PIR_INT) == true) {
-                delay(100);
+                digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
+                //        pinMode(GPIO_NUM_34, INPUT_PULLUP);
+                delay(2500);
+                attachInterrupt(PIR_INT, Ext_INT1_ISR, HIGH);
+                // Play sound *********************
+                PlayWakeupSong();
+
+                detachInterrupt(PIR_INT);
+                digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
+                while (digitalRead(PIR_INT) == true) {
+                    delay(100);
+                }
+
+                PaintWatch(display, false, false);
             }
-
-            PaintWatch(display, false, false);
+            else {
+                DPL("Alarm was fired by RTC, no active Alarm found on RTC-Data - dont do anything");
+            }
 
         };
 

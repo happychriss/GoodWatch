@@ -82,7 +82,9 @@ int SortTimes(void const *a, void const *b) {
     return (int) (ad->time.secondstime() - bd->time.secondstime());
 }
 
-void UpdateRTCWithNextAlarms() {
+bool UpdateRTCWithNextAlarms() {
+
+    bool b_valid_alarm_found=false;
 
     DateTime tmp_now = rtc_watch.now();
     DP("Check alarms to update, base time: ");
@@ -95,6 +97,8 @@ void UpdateRTCWithNextAlarms() {
 
             if (diff.seconds() < 15 && diff.seconds() > 0 && diff.hours() == 0 && diff.minutes() == 0) {
 
+                b_valid_alarm_found=true;
+
                 if (wc[i].type == single) {
                     DPL("Single Alarm - Update: deactivated");
                     rtcData.d.alarms[i].active = false;
@@ -103,6 +107,7 @@ void UpdateRTCWithNextAlarms() {
                 if (wc[i].type == repeating) {
                     rtcData.d.alarms[i].time = DetermineAlarmDay(i, rtcData.d.alarms[i].time.hour(), rtcData.d.alarms[i].time.minute());
                     DPF("Repeating Alarm - Updated: %s\n", rtcData.str_long(i).c_str());
+
                 }
 
             } else
@@ -110,6 +115,8 @@ void UpdateRTCWithNextAlarms() {
         }
 
     }
+
+    return b_valid_alarm_found;
 }
 
 int SetNextAlarm(bool b_write_to_rtc) {
@@ -149,6 +156,7 @@ int SetNextAlarm(bool b_write_to_rtc) {
             }
         } else {
             DPL("************ No active alarm");
+            // not really working: https://www.avrfreaks.net/forum/how-check-current-alarm-status-or-deactivate-alarm-ds3231
             rtc_watch.clearAlarm(ALARM2_ALARM);
             rtc_watch.disableAlarm(ALARM2_ALARM);
 
