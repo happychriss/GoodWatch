@@ -22,6 +22,7 @@ void rtcInit() ;
 void rtcSetRTCFromInternet() ;
 void espPrintTimeNow() ;
 void rtsSetEspTime(DateTime dt);
+DateTime  now_datetime();
 String rtcFormatCurrentTime(char * str_format);
 
 struct strct_alarm {

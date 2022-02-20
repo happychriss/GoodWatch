@@ -40,7 +40,9 @@ extern RtcData rtcData;
 // This functions checks for an alarm, if it should be set for the next day depending on the alarm type
 
 DateTime DetermineAlarmDay(int alarm_type_index, int hour, int min) {
-    DateTime tmp_now = rtc_watch.now();
+    DateTime tmp_now = now_datetime();
+    DP("TimeBase: ");DPL(DateTimeString(now_datetime()));
+
     DateTime input_time = DateTime(tmp_now.year(), tmp_now.month(), tmp_now.day(), hour, min);
 
     DPL("** Correct Time **");
@@ -86,9 +88,8 @@ bool UpdateRTCWithNextAlarms() {
 
     bool b_valid_alarm_found=false;
 
-    DateTime tmp_now = rtc_watch.now();
-    DP("Check alarms to update, base time: ");
-    DPL(DateTimeString(tmp_now));
+    DateTime tmp_now = now_datetime();
+    DP("TimeBase UpdateRTC: ");DPL(DateTimeString(tmp_now));
 
     for (int i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
         if (rtcData.d.alarms[i].active) {
@@ -121,7 +122,8 @@ bool UpdateRTCWithNextAlarms() {
 
 int SetNextAlarm(bool b_write_to_rtc) {
     int i;
-    DateTime tmp_now = rtc_watch.now();
+    DateTime tmp_now = now_datetime();
+    DP("TimeBase SetNextAlarm: ");DPL(DateTimeString(tmp_now));
 
     DPL("Input:");
     for (int i = 0; i < ALARM_NUMBERS_DISPLAY; i++) {
@@ -188,14 +190,10 @@ void ProgramAlarm(GxEPD2_GFX &d) {
     DPL("******** Program Alarm ********");
 
     rtcData.getRTCData();
-
-    d.refresh();
-    d.init(0, false);
-    d.setFont(&FreeSans12pt7b);
-    d.firstPage();
-
     InitVoiceCommands();
 
+    d.setFont(&FreeSans12pt7b);
+    d.firstPage();
     PaintAlarmScreen(d, "An/Aus [1..6] - Set [9]");
 
     char time_str[7] = TIME_EMPTY;
@@ -420,13 +418,6 @@ void PaintAlarmScreen(GxEPD2_GFX &d, const char title[]) {
 
 void ConfigGoodWatch(GxEPD2_GFX &d) {
 
-    InitVoiceCommands();
-
-    d.refresh();
-    d.init(0, false);
-    d.setFont(&FreeSans12pt7b);
-    d.firstPage();
-
     int adc = analogRead(BATTERY_VOLTAGE);
     double BatteryVoltage;
     BatteryVoltage = (adc * 7.445) / 4096;
@@ -435,19 +426,20 @@ void ConfigGoodWatch(GxEPD2_GFX &d) {
     char battery[30] = {};
     sprintf(battery, "Battery: %.2fV", BatteryVoltage);
 
+    d.setFont(&FreeSans12pt7b);
+    d.firstPage();
     do {
         //        display.setCursor(x1, y1);
         d.fillScreen(GxEPD_WHITE);
         d.setTextColor(GxEPD_BLACK);
-
         PL(d, MESSAGE_LINE, 1, "Welcome - GoodWatch", false, true);
         PL(d, 3 * PT12_HEIGHT, 1, "1: Record Sound", false, true);
         PL(d, 4 * PT12_HEIGHT, 1, "2: OTA Update", false, true);
         PL(d, 5 * PT12_HEIGHT, 1, "3: Play Music", false, true);
         PL(d, 6 * PT12_HEIGHT + PT12_BREAK, 1, battery, false, true);
-
     } while (d.nextPage());
 
+    InitVoiceCommands();
     int value_idx = GetVoiceCommand();
 
     if (value_idx == 1) {

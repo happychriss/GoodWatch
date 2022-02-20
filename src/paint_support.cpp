@@ -3,6 +3,7 @@
 //
 
 #include "paint_support.h"
+#include "rtc_support.h"
 
 extern RTC_DS3231 rtc_watch;
 
@@ -53,7 +54,9 @@ void PL(GxEPD2_GFX &d, int line, int column, String text, bool b_partial, bool b
 }
 
 void HoursUntilAlarm(DateTime alarm, char * timeuntil) {
-    TimeSpan diff_time = alarm - rtc_watch.now();
+//    TimeSpan diff_time = alarm - rtc_watch.now();
+    TimeSpan diff_time = alarm - now_datetime();
+
     if (diff_time.days()==0) {
         sprintf(timeuntil, "(%ih %imin)", diff_time.hours(), diff_time.minutes());
     } else {

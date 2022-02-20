@@ -4,7 +4,9 @@
 
 #include "rtc_support.h"
 #include <Arduino.h>
+#include <time.h>                       // time() ctime()
 #include <sys/time.h>
+
 #include "support.h"
 #include <global_hardware.h>
 
@@ -37,17 +39,30 @@ String DateTimeString(DateTime dt) {
 | mm        | the minute as a 2-digit number (00--59)                |
 | ss        | the second as a 2-digit number (00--59)                |*/
 
+DateTime tm_2_datetime(tm timeinfo) {
+    return DateTime(timeinfo.tm_year+1900,timeinfo.tm_mon+1,timeinfo.tm_mday,timeinfo.tm_hour,timeinfo.tm_min, timeinfo.tm_sec);
+}
+
 
 void espPrintTimeNow() {
     struct tm timeinfo={};
     time_t now;
+
     time(&now);
     localtime_r(&now, &timeinfo);
-    DP("Current *local* Time from Internet - ESP32: ");
-    char strftime_buf[30]={};
-    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-    DPL(strftime_buf);
 
+    DP("*local* Time from ESP32: ");
+    DPL(DateTimeString(tm_2_datetime(timeinfo)));
+}
+
+
+
+DateTime  now_datetime() {
+    struct tm timeinfo={};
+    time_t now;
+    time(&now);
+    localtime_r(&now, &timeinfo); //dont apply local time a 2nd time, rtc clock is already in local time.
+    return tm_2_datetime(timeinfo);
 }
 
 void rtcInit() {
@@ -67,23 +82,27 @@ void rtcInit() {
 }
 
 void rtcSetRTCFromInternet() {
+    // RTC is programmed in *local time*
+    // Set timezone to Berlin Standard Time
+
+    espPrintTimeNow();
     struct tm timeinfo={};
     time_t now;
-    char strftime_buf[30]={};
     time(&now);
     localtime_r(&now, &timeinfo);
-    DP("Internet Time: ");
-    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-    DPL(strftime_buf);
-    rtc_watch.adjust(DateTime(timeinfo.tm_year+1900,timeinfo.tm_mon+1,timeinfo.tm_mday,timeinfo.tm_hour,timeinfo.tm_min, timeinfo.tm_sec));
-
+    rtc_watch.adjust(tm_2_datetime(timeinfo));
+    delay(100);
+//    DP("RTC Time Set: ");DPL(DateTimeString(rtc_watch.now()));
 }
 
 void rtsSetEspTime(DateTime dt) {
-    timeval tv;
+    timeval tv{};
+    const timezone tz = { 0, 0};
     tv.tv_sec = dt.unixtime();
     tv.tv_usec = 0;  // keine Mikrosekunden setzen
-    settimeofday(&tv, NULL);
+    settimeofday(&tv, &tz);
+    espPrintTimeNow();
+
 }
 
 

@@ -4,6 +4,7 @@
 
 
 #include "wifi_support.h"
+#include "esp_sntp.h"
 
 
 // Wifi and Connectivity
@@ -20,7 +21,7 @@ void SetupWifi_SNTP() {
     WiFi.setSleep(false);
     uint8_t connect_result;
 
-    for (int i=0;i<10;i++) {
+    for (int i=0;i<20;i++) {
         connect_result=WiFi.waitForConnectResult() ;
         if (connect_result==WL_CONNECTED) break;
         DP(".");
@@ -32,7 +33,7 @@ void SetupWifi_SNTP() {
         delay(5000);
         ESP.restart();
     }
-    delay(500);
+    delay(200);
 
     DPL("Wifi Details:");
     DP("Wifi DNS: ");
@@ -53,19 +54,34 @@ void SetupWifi_SNTP() {
         uint32_t dt = millis() - t;
         DPF("Connected in: %i\n", dt);
     }*/
-    DPL("DONE");
+    DPL("WIFI DONE");
 
     DP("SNT Server Setup:");
 
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0,  (char*) "pool.ntp.org");
     sntp_init();
+
+    sntp_sync_status_t st;
+    int count=0;
+    do {
+        st=sntp_get_sync_status();
+        count++;
+        DP(".");
+        delay(500);
+    } while (st!=SNTP_SYNC_STATUS_COMPLETED && count<20);
+    DPL();
+    if (st!=SNTP_SYNC_STATUS_COMPLETED) {
+        DP("ERROR TIME SYNC:");DPL(st);
+        delay(5000);
+        ESP.restart();
+    }
+
     setenv("TZ", "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00", 1);
     tzset();
 
     delay(500); //needed until time is available
-    DPL("DONE");
-
+    DPL("SNTP DONE");
 
 }
 
@@ -83,3 +99,4 @@ void sendData(uint8_t *bytes, size_t count) {
 
     // digitalWrite(LED_BUILTIN, LOW);
 }
+

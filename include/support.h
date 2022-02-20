@@ -22,6 +22,7 @@
 #define DP(x)
 #define DPD(x)
 #define DPL(x)
+#define DPF(...)
 #endif
 
 int SerialKeyWait();
