@@ -25,6 +25,21 @@ void fade_in(void *parameter) {
     vTaskDelete(NULL);
 }
 
+
+void fade_out(void *parameter) {
+    int vol = audio.getVolume();
+    DPF("End of Song, PIR was raised witht Volume: %i\n",vol);
+
+    for (int i = vol; i >= 0; i--) {
+        audio.setVolume(i);
+        delay(200);
+        DPF("INT volume: %i\n", i);
+    }
+    b_audio_finished = true;
+    vTaskDelete(NULL);
+}
+
+
 void PlayWakeupSong() {
 
     if (!SPIFFS.begin(true, "/spiffs", 5, NULL)) {
@@ -45,6 +60,7 @@ void PlayWakeupSong() {
             NULL);                     /* Task handle. */
 
 
+
     //    SerialKeyWait();
 
 
@@ -54,17 +70,24 @@ void PlayWakeupSong() {
 //    audio.connecttohost("http://www.wdr.de/wdrlive/media/einslive.m3u");
 
     DPL("Play the song!!!");
-    while (!b_audio_end_of_mp3) {
+    b_audio_finished=false;
+    while ((!b_audio_end_of_mp3) && (!b_audio_finished)) {
 
         audio.loop();
 
         if (b_pir_wave) {
-            DPL("End of Song, PIR was raised");
-            audio.setVolume(0); // 0...21
-            delay(200);
-            b_pir_wave = false;
-            break;
+            b_pir_wave=false;
+            int vol = audio.getVolume();
+            DPF("End of Song, PIR was raised witht Volume: %i\n",vol);
+            xTaskCreate(
+                    fade_out,              /* Task function. */
+                    "fade_out",            /* String with name of task. */
+                    10000,                     /* Stack size in words. */
+                    NULL,       /* Parameter passed as input of the task */
+                    1,                         /* Priority of the task. */
+                    NULL);                     /* Task handle. */
         }
+
         if (Serial.available()) { // put streamURL in serial monitor
             audio.stopSong();
             String r = Serial.readString();

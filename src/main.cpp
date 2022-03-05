@@ -71,6 +71,7 @@ QueueHandle_t m_i2sQueue;
 
 // Audio playing
 bool b_audio_end_of_mp3 = false;
+bool b_audio_finished = false;
 Audio audio;
 
 RTC_DATA_ATTR bool b_watch_refreshed = false;
@@ -123,7 +124,6 @@ void setup() {
         PlayWakeupSong();
     }
 
-
 }
 
 /* MAIN LOOP *********************************************************************************************/
@@ -133,22 +133,20 @@ void loop() {
 
     wakeup_reason = print_wakeup_reason();
 
-    // initializing the rtc
     if (!rtc_watch.begin()) {
-        Serial.println("Couldn't find RTC!");
-        Serial.flush();
+        DPL("Couldn't find RTC!");
         abort();
     }
-    DPL("RTC Init: OK");
+    DateTime now=rtc_watch.now();
+    DP("RTC Time now:"); DPL( DateTimeString(now));
 
+//    I2C_Scanner();
 
     int adc = analogRead(BATTERY_VOLTAGE);
     double BatteryVoltage;
     BatteryVoltage = (adc * 7.445) / 4096;
     DP("Battery V: ");
     DPL(BatteryVoltage);
-
-    // full init of display on Boot = ESP_SLEEP_WAKEUP_UNDEFINED
 
     /*
         // **********************************************************************************************
@@ -166,10 +164,11 @@ void loop() {
         rtc_watch.disable32K();
         rtc_watch.clearAlarm(ALARM1_5_MIN);
         rtc_watch.clearAlarm(ALARM2_ALARM);
-
         rtcSetRTCFromInternet();
 
+
         display.init(DEBUG_DISPLAY, true);
+
         PaintWatch(display, false, false);
 
     } else {
@@ -197,7 +196,7 @@ void loop() {
         DPL("!!!! RTC Alarm Clock Wakeup");
         /* 5 min wakeup  ***************************************************************************/
         if (rtc_watch.alarmFired(ALARM1_5_MIN)) {
-            DPL("*** Alarm2 Fired: Alarm for 5min refresh");
+            DPL("*** Alarm1 Fired: Alarm for 5min refresh");
             DPL("!!! RTC Wakeup after 5min");
             rtc_watch.clearAlarm(ALARM1_5_MIN);
             rtc_watch.disableAlarm(ALARM1_5_MIN);
@@ -249,7 +248,7 @@ void loop() {
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
         DPL("!!!! PIR Sensor Wakeup with ");
 
-        // Initialize APDS-9960 (configure I2C and initial values)
+    /*    // Initialize APDS-9960 (configure I2C and initial values)
         distance_sensor.init();
         distance_sensor.configureDefault();
         distance_sensor.setScaling(2); // distance
@@ -270,10 +269,12 @@ void loop() {
         avg_proximity_data=distance_sensor.readRangeContinuousMillimeters();
         DP("Proximity Sensor:");DPL(avg_proximity_data);
         distance_sensor.stopContinuous();
-
+*/
 /*        // **********************************************************************************************
         // VERY CLOSE - Data Acuisition and OTA Update **************************************************
         // ***********************************************************************************************/
+
+        uint16_t avg_proximity_data = 50;
 
         if (avg_proximity_data < 30) { //hand is very close
             DPL("Proximity-Check: Very close: Config Goodwatch");
@@ -323,13 +324,13 @@ void loop() {
     // ***********************************************************************************************/
 
 
-    Serial.println("Prepare deep sleep");
+    DPL("Prepare deep sleep");
 
     digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
 
 //    esp_sleep_enable_timer_wakeup(sleep_sec * 1000 * 1000);
 #define WAKUEP_INTERVAL 5
-    DateTime dt = rtc_watch.now();
+    DateTime dt = now_datetime();
     int next_wake_up_min = (((dt.minute()) / WAKUEP_INTERVAL) * WAKUEP_INTERVAL) + WAKUEP_INTERVAL;
     if (next_wake_up_min == 60) next_wake_up_min = 0;
     DateTime alarm(0, 0, 0, 0, next_wake_up_min, 0);
@@ -345,6 +346,11 @@ void loop() {
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_34, HIGH); //1 = High, 0 = Low
     //delay(1000);
     display.powerOff();
+/*  Not sure if needed
+    Wire.end(); // shutdown/power off I2C hardware,
+    pinMode(SDA,INPUT); // needed because Wire.end() enables pullups, power Saving
+    pinMode(SCL,INPUT);
+*/
     esp_wifi_stop();
     esp_deep_sleep_start();
 //    esp_light_sleep_start();

@@ -7,6 +7,7 @@
 
 extern bool b_audio_end_of_mp3;
 extern bool b_pir_wave;
+extern bool b_audio_finished;
 extern Audio audio;
 
 void PlayWakeupSong();

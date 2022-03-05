@@ -24,7 +24,7 @@ void espPrintTimeNow() ;
 void rtsSetEspTime(DateTime dt);
 DateTime  now_datetime();
 String rtcFormatCurrentTime(char * str_format);
-
+void I2C_Scanner();
 struct strct_alarm {
     uint8_t i =0;
     bool active = {false};

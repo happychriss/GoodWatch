@@ -519,6 +519,9 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
             DateTime rtc_alarm = {};
             if (rtc_watch.getAlarm2(&rtc_alarm, now)) { ;
                 TimeSpan wakeup = rtc_alarm - now;
+                DPL("** Check for Display of Wakup-Min**");
+                DP("RTC Alarm: ");DPL(DateTimeString(rtc_alarm));
+                DP("Now      : ");DPL(DateTimeString(now));
                 // Normal mode, show hours
                 if (wakeup.hours() < 24 && wakeup.days() == 0) {
                     char str_format2[] = "hh:mm";
@@ -531,4 +534,5 @@ void PaintWatch(GxEPD2_GFX &display, boolean b_refresh_only, boolean b_show_hhmm
         } while (display.nextPage());
     }
 }
+
 

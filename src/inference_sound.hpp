@@ -17,7 +17,7 @@
 #include <wifi_support.h>
 #include <global_display.h>
 
-#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
 /** Audio buffers, pointers and selectors */
 typedef struct {
@@ -109,7 +109,9 @@ void i2s_init(void) {
         ESP_LOGE(TAG, "Error in initializing dma buffer with 0");
     }
 
+
 }
+
 
 void addSample(int16_t sample) {
     inference.buffers[inference.buf_select][inference.buf_count++] = sample;
@@ -237,6 +239,7 @@ void microphone_inference_end(void) {
     free(sampleBuffer);
     if (xHandle != nullptr) {
         vTaskDelete(xHandle);
+        i2s_stop(I2S_MICRO);
     }
 }
 
@@ -341,7 +344,7 @@ int GetVoiceCommand() {
             // Find the best value, and note if more then 85%
             for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
                 if ((result.classification[ix].value > 0.85) && (result.classification[ix].label[0] != 'N')) {
-                    ei_printf("\nResults:\n");
+                    DPF("\nResults:\n");
                     b_found_result = true;
                     if (result.classification[ix].value > max_value) {
                         max_value = result.classification[ix].value;

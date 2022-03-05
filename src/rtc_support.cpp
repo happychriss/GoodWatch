@@ -16,14 +16,45 @@
 extern RTC_DS3231 rtc_watch;
 
 String DateTimeString(DateTime dt) {
-    char str_format[]="hh:mm:ss - DDD, DD.MM.YYYY";
-    String str_time_now=dt.toString(str_format);
+    char str_format[] = "hh:mm:ss - DDD, DD.MM.YYYY";
+    String str_time_now = dt.toString(str_format);
     return str_time_now;
 }
 
 
+void I2C_Scanner() {
+    byte error, address; //variable for error and I2C address
+    int nDevices;
+    DPL("Scanning I2 Bus...");
 
+    nDevices = 0;
+    for (address = 1; address < 127; address++) {
+// The i2c_scanner uses the return value of
+// the Write.endTransmisstion to see if
+// a device did acknowledge to the address.
+        Wire.beginTransmission(address);
+        error = Wire.endTransmission();
 
+        if (error == 0) {
+            DP("I2C device found at address 0x");
+            if (address < 16)
+                DP("0");
+            DPF("%x",address);
+            DPL("  !");
+            nDevices++;
+        } else if (error == 4) {
+            DP("Unknown error at address 0x");
+            if (address < 16)
+                DP("0");
+            DPF("%x",address);
+        }
+    }
+    if (nDevices == 0)
+        DPL("No I2C devices found\n");
+    else
+        DPL("done\n");
+
+}
 
 /*| specifier | output                                                 |
 |-----------|--------------------------------------------------------|
@@ -40,12 +71,12 @@ String DateTimeString(DateTime dt) {
 | ss        | the second as a 2-digit number (00--59)                |*/
 
 DateTime tm_2_datetime(tm timeinfo) {
-    return DateTime(timeinfo.tm_year+1900,timeinfo.tm_mon+1,timeinfo.tm_mday,timeinfo.tm_hour,timeinfo.tm_min, timeinfo.tm_sec);
+    return DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 }
 
 
 void espPrintTimeNow() {
-    struct tm timeinfo={};
+    struct tm timeinfo = {};
     time_t now;
 
     time(&now);
@@ -56,9 +87,8 @@ void espPrintTimeNow() {
 }
 
 
-
-DateTime  now_datetime() {
-    struct tm timeinfo={};
+DateTime now_datetime() {
+    struct tm timeinfo = {};
     time_t now;
     time(&now);
     localtime_r(&now, &timeinfo); //dont apply local time a 2nd time, rtc clock is already in local time.
@@ -67,9 +97,8 @@ DateTime  now_datetime() {
 
 void rtcInit() {
     // initializing the rtc
-    if(!rtc_watch.begin()) {
-        Serial.println("Couldn't find RTC!");
-        Serial.flush();
+    if (!rtc_watch.begin()) {
+        DPL("Couldn't find RTC!");
         abort();
     }
 
@@ -86,18 +115,18 @@ void rtcSetRTCFromInternet() {
     // Set timezone to Berlin Standard Time
 
     espPrintTimeNow();
-    struct tm timeinfo={};
+    struct tm timeinfo = {};
     time_t now;
     time(&now);
     localtime_r(&now, &timeinfo);
     rtc_watch.adjust(tm_2_datetime(timeinfo));
     delay(100);
-//    DP("RTC Time Set: ");DPL(DateTimeString(rtc_watch.now()));
+    DP("RTC Time Set: ");DPL(DateTimeString(rtc_watch.now()));
 }
 
 void rtsSetEspTime(DateTime dt) {
     timeval tv{};
-    const timezone tz = { 0, 0};
+    const timezone tz = {0, 0};
     tv.tv_sec = dt.unixtime();
     tv.tv_usec = 0;  // keine Mikrosekunden setzen
     settimeofday(&tv, &tz);

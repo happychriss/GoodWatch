@@ -29,7 +29,7 @@ void SetupWifi_SNTP() {
     }
 
     if (connect_result!=WL_CONNECTED) {
-        Serial.println("Connection Failed! Rebooting...");
+        DPL("Connection Failed! Rebooting...");
         delay(5000);
         ESP.restart();
     }

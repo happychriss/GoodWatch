@@ -37,6 +37,23 @@ extern RTC_DS3231 rtc_watch;
 extern RtcData rtcData;
 
 
+void TestAlarmWrite() {
+    // schedule an alarm 10 seconds in the future
+    DateTime wakeup=     rtc_watch.now() + TimeSpan(60);
+    DP("Wakeup:"); DPL( DateTimeString(wakeup));
+    if(!rtc_watch.setAlarm2(
+            wakeup,
+            DS3231_A2_Date // this mode triggers the alarm when the seconds match. See Doxygen for other options
+    )) {
+        Serial.println("Error, alarm wasn't set!");
+    }else {
+        Serial.println("Alarm will happen in 60 seconds!");
+    }
+    DateTime now=rtc_watch.now();
+    DateTime rtc_alarm = {};
+    rtc_watch.getAlarm2(&rtc_alarm, now);
+}
+
 // This functions checks for an alarm, if it should be set for the next day depending on the alarm type
 
 DateTime DetermineAlarmDay(int alarm_type_index, int hour, int min) {
@@ -151,10 +168,38 @@ int SetNextAlarm(bool b_write_to_rtc) {
             DateTime alarm = rtcData.d.alarms[next_alarm].time;
             DPF("************ Setting Alarm[%i]: ", next_alarm);
             DPL(DateTimeString(alarm));
-            if (!rtc_watch.setAlarm2(alarm, DS3231_A2_Date)) {
+            while(false) {
+                DateTime gt_alarm;
+                rtc_watch.getAlarm2(&gt_alarm,tmp_now);
+                DPL(DateTimeString(gt_alarm));
+                delay(100);
+            }
 
+            bool b_set_alarm = false;
+            Serial.print("Write-Alarm: ");Serial.println(DateTimeString(alarm));
+            rtc_watch.clearAlarm(ALARM2_ALARM);
+            for (int ac=0;ac<15;ac++) {
+                Serial.println(ac);
+                if (rtc_watch.setAlarm2(alarm, DS3231_A2_Date)) {
+                    b_set_alarm = true;
+                    break;
+                }
+                delay(500);
+            }
+            Serial.println("Done");
+
+            if (!b_set_alarm) {
                 DPL("!!!!!!!! ERROR SETTING ALARM");
+                Serial.print("Error - Write -Alarm: ");Serial.println(DateTimeString(alarm));
                 next_alarm = -1;
+            } else {
+/*               DateTime tmp_alarm;
+                delay(200);
+                rtc_watch.getAlarm2(&tmp_alarm,tmp_now);
+                Serial.print("TimeNow: ");Serial.println(DateTimeString(tmp_now));
+                Serial.print("Write-Alarm: ");Serial.println(DateTimeString(alarm));
+                Serial.print("Read-Alarm: ");Serial.println(DateTimeString(tmp_alarm));*/
+
             }
         } else {
             DPL("************ No active alarm");
@@ -191,7 +236,6 @@ void ProgramAlarm(GxEPD2_GFX &d) {
 
     rtcData.getRTCData();
     InitVoiceCommands();
-
     d.setFont(&FreeSans12pt7b);
     d.firstPage();
     PaintAlarmScreen(d, "An/Aus [1..6] - Set [9]");
@@ -201,6 +245,8 @@ void ProgramAlarm(GxEPD2_GFX &d) {
     bool b_menu_loop = true;
     int value_idx = 0;
     int selected_alarm = 0;
+
+
 
     // main menu loop
     do {
@@ -369,9 +415,9 @@ void ProgramAlarm(GxEPD2_GFX &d) {
 
     } while (b_menu_loop);
 
+    microphone_inference_end();
     SetNextAlarm(true); // determines next alarm and writes it into RTC
 
-    microphone_inference_end();
 
 }
 
@@ -463,21 +509,21 @@ void ConfigGoodWatch(GxEPD2_GFX &d) {
                         type = "filesystem";
 
                     // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-                    Serial.println("Start updating " + type);
+                    DPL("Start updating " + type);
                 })
                 .onEnd([]() {
-                    Serial.println("\nEnd");
+                    DPL("\nEnd");
                 })
                 .onProgress([](unsigned int progress, unsigned int total) {
-                    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+                    DPF("Progress: %u%%\r", (progress / (total / 100)));
                 })
                 .onError([](ota_error_t error) {
-                    Serial.printf("Error[%u]: ", error);
-                    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-                    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-                    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-                    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-                    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+                    DPF("Error[%u]: ", error);
+                    if (error == OTA_AUTH_ERROR) DPL("Auth Failed");
+                    else if (error == OTA_BEGIN_ERROR) DPL("Begin Failed");
+                    else if (error == OTA_CONNECT_ERROR) DPL("Connect Failed");
+                    else if (error == OTA_RECEIVE_ERROR) DPL("Receive Failed");
+                    else if (error == OTA_END_ERROR) DPL("End Failed");
                 });
 
         DPL("OTA Update Ready!!!");
