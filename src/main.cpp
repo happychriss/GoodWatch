@@ -37,12 +37,10 @@
 #define DEBUG_DISPLAY 0 //115200
 
 
-
 //********** Global Variables ***************************************************
 // Wake Up Sensor
 VL6180X distance_sensor;
-enum vl6180x_als_gain
-{ // Data sheet shows gain values as binary list
+enum vl6180x_als_gain { // Data sheet shows gain values as binary list
 
     GAIN_20 = 0, // Actual ALS Gain of 20
     GAIN_10,     // Actual ALS Gain of 10.32
@@ -123,6 +121,7 @@ void setup() {
         delay(2500);
         PlayWakeupSong();
     }
+    DPL("Setup: DONE");
 
 }
 
@@ -137,8 +136,9 @@ void loop() {
         DPL("Couldn't find RTC!");
         abort();
     }
-    DateTime now=rtc_watch.now();
-    DP("RTC Time now:"); DPL( DateTimeString(now));
+    DateTime now = rtc_watch.now();
+    DP("RTC Time now:");
+    DPL(DateTimeString(now));
 
 //    I2C_Scanner();
 
@@ -165,7 +165,8 @@ void loop() {
         rtc_watch.clearAlarm(ALARM1_5_MIN);
         rtc_watch.clearAlarm(ALARM2_ALARM);
         rtcSetRTCFromInternet();
-
+        DPF("RTC Init with Temperature: %f\n", rtc_watch.getTemperature()); // in Celsius degree
+        ;
 
         display.init(DEBUG_DISPLAY, true);
 
@@ -220,7 +221,7 @@ void loop() {
 
                 digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
                 //        pinMode(GPIO_NUM_34, INPUT_PULLUP);
-                delay(2500);
+//                delay(2500);
                 attachInterrupt(PIR_INT, Ext_INT1_ISR, HIGH);
                 // Play sound *********************
                 PlayWakeupSong();
@@ -246,13 +247,14 @@ void loop() {
        // ***********************************************************************************************/
 
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-        DPL("!!!! PIR Sensor Wakeup with ");
 
-    /*    // Initialize APDS-9960 (configure I2C and initial values)
+        DPL("!!!! PIR Sensor Wakeup !!!! ");
+
+        // Initialize APDS-9960 (configure I2C and initial values)
         distance_sensor.init();
         distance_sensor.configureDefault();
         distance_sensor.setScaling(2); // distance
-        distance_sensor.writeReg(VL6180X::SYSALS__ANALOGUE_GAIN, (0x40 | GAIN_40)) ;// ALS
+        distance_sensor.writeReg(VL6180X::SYSALS__ANALOGUE_GAIN, (0x40 | GAIN_40));// ALS
         distance_sensor.writeReg(VL6180X::SYSRANGE__MAX_CONVERGENCE_TIME, 30);
         distance_sensor.writeReg16Bit(VL6180X::SYSALS__INTEGRATION_PERIOD, 50);
         distance_sensor.setTimeout(500);
@@ -260,21 +262,25 @@ void loop() {
         delay(120);
         distance_sensor.startInterleavedContinuous(100);
 
-        uint16_t light_value = 0;
-        uint8_t proximity_data = 0;
+
         uint16_t ambient_light = 0;
         uint16_t avg_proximity_data = 0;
-
-
-        avg_proximity_data=distance_sensor.readRangeContinuousMillimeters();
-        DP("Proximity Sensor:");DPL(avg_proximity_data);
+        avg_proximity_data = distance_sensor.readRangeContinuousMillimeters();
         distance_sensor.stopContinuous();
-*/
+        ambient_light = distance_sensor.readAmbientSingle();
+        DP("Proximity: ");DPL(avg_proximity_data);
+        DP("Ambient Light: "); DPL(ambient_light);
+//        ambient_light = 0;
+
+        if (ambient_light == 0) {
+            digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
+            pwm_up_down_esp32(true);
+        }
+
 /*        // **********************************************************************************************
         // VERY CLOSE - Data Acuisition and OTA Update **************************************************
         // ***********************************************************************************************/
 
-        uint16_t avg_proximity_data = 50;
 
         if (avg_proximity_data < 30) { //hand is very close
             DPL("Proximity-Check: Very close: Config Goodwatch");
@@ -283,7 +289,7 @@ void loop() {
             ConfigGoodWatch(display);
             display.clearScreen();
             PaintWatch(display, false, false);
-        } else if (avg_proximity_data <70) { //hand a bit away
+        } else if (avg_proximity_data < 70) { //hand a bit away
 
 /*            // **********************************************************************************************
             // Medium Close - Show Alarm Screen ********** **************************************************
@@ -299,18 +305,12 @@ void loop() {
             PaintQuickTime(display, false);
         }
 
-#ifdef xx
         if (ambient_light == 0) {
-            delay(1000);
-            pwm_up_down(false, pwmtable_16, 256 / 4, 20);
-            digitalWrite(DISPLAY_AND_SOUND_POWER, LOW);
-        } else {
-            if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER) {
-                DPL("Show current time");
-                PaintWatch(display, true, false);
-            }
+            digitalWrite(DISPLAY_AND_SOUND_POWER, HIGH);
+            pwm_up_down_esp32(false);
+            delay(500);
         }
-#endif
+
         // Give the PIR time to go down, before going to sleep
         while (digitalRead(PIR_INT) == true) {
             delay(100);
@@ -343,7 +343,7 @@ void loop() {
     esp_sleep_enable_ext1_wakeup(0x8000000000, ESP_EXT1_WAKEUP_ALL_LOW); //1 = High, 0 = Low
 
     // Alarm from PIR
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_34, HIGH); //1 = High, 0 = Low
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_34, HIGH); //1 = High, 0 = Low
     //delay(1000);
     display.powerOff();
 /*  Not sure if needed

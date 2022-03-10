@@ -87,12 +87,52 @@ void pwm_up_down(boolean direction_up, const uint16_t pwm_table[], int16_t size,
 
         for (tmp = size - 1; tmp >= 0; tmp--) {
             uint16_t out = pgm_read_word (&pwm_table[tmp]);
-//        Serial.println(out);
             analogWrite(DISPLAY_CONTROL, out);
             delay(delay_ms);
         }
     }
 }
+
+void run_up_down_task( void * parameter ){
+#define MAX_LIGHT_LEVEL 128
+
+    bool direction_up = *((bool*)parameter);
+    const int freq = 120;
+    const int ledChannel = 0;
+    const int resolution = 8;
+    ledcSetup(ledChannel, freq, resolution);
+    ledcAttachPin(DISPLAY_CONTROL, ledChannel);
+
+    if (direction_up) {
+        for (int dutyCycle = 0; dutyCycle <= MAX_LIGHT_LEVEL; dutyCycle++) {
+            // changing the LED brightness with PWM
+            ledcWrite(ledChannel, dutyCycle);
+            delay(10);
+        }
+    } else {
+        for(int dutyCycle = MAX_LIGHT_LEVEL; dutyCycle >= 0; dutyCycle--){
+            // changing the LED brightness with PWM
+            ledcWrite(ledChannel, dutyCycle);
+            delay(3);
+        }
+    }
+    vTaskDelete(NULL);
+}
+
+
+void pwm_up_down_esp32(boolean direction_up) {
+
+    xTaskCreate(
+            run_up_down_task,    // Function that should be called
+            "run_up_down_task",  // Name of the task (for debugging)
+            1000,            // Stack size (bytes)
+            (void *) &direction_up,            // Parameter to pass
+            1,               // Task priority
+            NULL             // Task handle
+    );
+}
+
+
 
 void helloValue(GxEPD2_GFX &display, double v, int digits) {
     Serial.print("helloValue:");

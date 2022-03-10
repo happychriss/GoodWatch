@@ -19,21 +19,20 @@ void fade_in(void *parameter) {
     for (int i = 0; i < 21; i++) {
         audio.setVolume(i);
         vTaskDelay(pdMS_TO_TICKS(1000));
-        DPF("INT volume: %i\n", i);
+        DPF("INT Fade-In Volume: %i\n", i);
         if (b_pir_wave) break;
     }
     vTaskDelete(NULL);
 }
 
-
 void fade_out(void *parameter) {
     int vol = audio.getVolume();
-    DPF("End of Song, PIR was raised witht Volume: %i\n",vol);
+    DPF("End of Song, PIR was raised with Volume: %i\n", vol);
 
     for (int i = vol; i >= 0; i--) {
         audio.setVolume(i);
         delay(200);
-        DPF("INT volume: %i\n", i);
+        DPF("INT Fade-Out Volume: %i\n", i);
     }
     b_audio_finished = true;
     vTaskDelete(NULL);
@@ -46,39 +45,34 @@ void PlayWakeupSong() {
         DPL("!!!!!  SPIFF Mount Failed !!!!!!!!!!!");
     }
 
-
     audio.setPinout(I2S_NUM_1_BCLK, I2S_NUM_1_LRC, I2S_NUM_1_DOUT);
     audio.setVolume(0); // 0...21
     audio.forceMono(true);
+    audio.connecttoFS(SPIFFS, "/carmen.mp3");
+//        audio.connecttohost("https://storage.googleapis.com/gw_wakeup_sounds/beat.mp3");
+//         audio.connecttohost("http://mp3.ffh.de/radioffh/hqlivestream.aac");
+//    audio.connecttohost("http://www.wdr.de/wdrlive/media/einslive.m3u");
 
+    TaskHandle_t xHandle = NULL;
     xTaskCreate(
             fade_in,              /* Task function. */
             "fade_in",            /* String with name of task. */
             10000,                     /* Stack size in words. */
             NULL,       /* Parameter passed as input of the task */
             1,                         /* Priority of the task. */
-            NULL);                     /* Task handle. */
-
-
-
-    //    SerialKeyWait();
-
-
-    audio.connecttoFS(SPIFFS, "/carmen.mp3");
-//        audio.connecttohost("https://storage.googleapis.com/gw_wakeup_sounds/beat.mp3");
-//         audio.connecttohost("http://mp3.ffh.de/radioffh/hqlivestream.aac");
-//    audio.connecttohost("http://www.wdr.de/wdrlive/media/einslive.m3u");
+            &xHandle);                     /* Task handle. */
+    configASSERT(xHandle);
 
     DPL("Play the song!!!");
-    b_audio_finished=false;
+    b_audio_finished = false;
+
     while ((!b_audio_end_of_mp3) && (!b_audio_finished)) {
 
         audio.loop();
 
         if (b_pir_wave) {
-            b_pir_wave=false;
-            int vol = audio.getVolume();
-            DPF("End of Song, PIR was raised witht Volume: %i\n",vol);
+            vTaskDelete(xHandle);
+            b_pir_wave = false;
             xTaskCreate(
                     fade_out,              /* Task function. */
                     "fade_out",            /* String with name of task. */
@@ -99,4 +93,5 @@ void PlayWakeupSong() {
     delay(500);
     DPL("DONE");
 }
+
 

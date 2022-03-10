@@ -168,38 +168,24 @@ int SetNextAlarm(bool b_write_to_rtc) {
             DateTime alarm = rtcData.d.alarms[next_alarm].time;
             DPF("************ Setting Alarm[%i]: ", next_alarm);
             DPL(DateTimeString(alarm));
-            while(false) {
-                DateTime gt_alarm;
-                rtc_watch.getAlarm2(&gt_alarm,tmp_now);
-                DPL(DateTimeString(gt_alarm));
-                delay(100);
-            }
 
             bool b_set_alarm = false;
-            Serial.print("Write-Alarm: ");Serial.println(DateTimeString(alarm));
+            DP("Write-Alarm: ");DPL(DateTimeString(alarm));
             rtc_watch.clearAlarm(ALARM2_ALARM);
             for (int ac=0;ac<15;ac++) {
-                Serial.println(ac);
+                DP("Try: "); DPL(ac);
                 if (rtc_watch.setAlarm2(alarm, DS3231_A2_Date)) {
                     b_set_alarm = true;
                     break;
                 }
                 delay(500);
             }
-            Serial.println("Done");
+            DPL("Done");
 
             if (!b_set_alarm) {
-                DPL("!!!!!!!! ERROR SETTING ALARM");
-                Serial.print("Error - Write -Alarm: ");Serial.println(DateTimeString(alarm));
+                DPL("!!!!!!!! ERROR SETTING ALARM!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                DPL(DateTimeString(alarm));
                 next_alarm = -1;
-            } else {
-/*               DateTime tmp_alarm;
-                delay(200);
-                rtc_watch.getAlarm2(&tmp_alarm,tmp_now);
-                Serial.print("TimeNow: ");Serial.println(DateTimeString(tmp_now));
-                Serial.print("Write-Alarm: ");Serial.println(DateTimeString(alarm));
-                Serial.print("Read-Alarm: ");Serial.println(DateTimeString(tmp_alarm));*/
-
             }
         } else {
             DPL("************ No active alarm");
